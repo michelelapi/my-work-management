@@ -1,0 +1,594 @@
+# Self-Employed Work Management Platform - Complete Development Guide
+
+## Project Overview
+Build a comprehensive work management platform for self-employed professionals with React frontend, Spring Boot microservices backend, Python AI agent, and full Docker containerization.
+
+## Application Architecture
+
+### Frontend (React)
+**Tech Stack:** React 18, TypeScript, Tailwind CSS, React Router, Axios, Chart.js/Recharts
+**Key Features:**
+- Dashboard with work overview and earnings charts
+- Company management (add, edit, delete, view details)
+- Project management with tariff settings
+- Task management with time tracking and billing status
+- AI chat interface for natural language commands
+- Billing and payment tracking
+- Time reports and analytics
+- Responsive design with modern UI/UX
+
+### Backend Microservices (Spring Boot)
+
+#### 1. Company Service (Port 8081)
+**Responsibilities:**
+- Company CRUD operations
+- Company profile management
+- Contact information and details
+- Company-specific settings
+- Integration with Project Service
+
+**Tech Stack:** Spring Boot 3, Spring Data JPA, PostgreSQL, Spring Validation
+
+#### 2. Project Service (Port 8082)
+**Responsibilities:**
+- Project CRUD operations
+- Project-company relationships
+- Tariff management (daily/hourly rates)
+- Project status tracking
+- Integration with Company and Task Services
+
+**Tech Stack:** Spring Boot 3, Spring Data JPA, PostgreSQL, Spring Cloud OpenFeign
+
+#### 3. Task Service (Port 8083)
+**Responsibilities:**
+- Task CRUD operations with time tracking
+- Billing status management
+- Payment status tracking
+- Task-project relationships
+- Time calculations and validations
+
+**Tech Stack:** Spring Boot 3, Spring Data JPA, PostgreSQL, Spring Cloud OpenFeign
+
+#### 4. Analytics Service (Port 8084)
+**Responsibilities:**
+- Earnings calculations and reports
+- Time tracking analytics
+- Billing summaries
+- Payment status reports
+- Monthly/yearly overviews
+- Data aggregation from all services
+
+**Tech Stack:** Spring Boot 3, Spring Data JPA, PostgreSQL, Spring Cloud OpenFeign
+
+### AI Agent (Python)
+**Responsibilities:**
+- Natural language processing for work management commands
+- Company/Project/Task creation via voice commands
+- Work pattern analysis and insights
+- Billing reminders and suggestions
+- Integration with backend APIs
+
+**Tech Stack:** Python 3.11, FastAPI, OpenAI API, SQLAlchemy, Pandas, NumPy
+
+### Database Design
+PostgreSQL with separate databases for each service:
+- `company_service_db`: companies, contacts
+- `project_service_db`: projects, tariffs
+- `task_service_db`: tasks, time_entries
+- `analytics_service_db`: reports, summaries
+
+## Detailed Implementation Steps
+
+### Step 1: Database Schema Design
+Create PostgreSQL database schemas for:
+
+**COMPANY_SERVICE_DB:**
+```sql
+-- companies table
+CREATE TABLE companies (
+    id BIGSERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    contact_person VARCHAR(255),
+    email VARCHAR(255),
+    phone VARCHAR(50),
+    address TEXT,
+    website VARCHAR(255),
+    tax_id VARCHAR(100),
+    payment_terms INTEGER DEFAULT 30,
+    status VARCHAR(50) DEFAULT 'ACTIVE',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- company_contacts table
+CREATE TABLE company_contacts (
+    id BIGSERIAL PRIMARY KEY,
+    company_id BIGINT REFERENCES companies(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255),
+    phone VARCHAR(50),
+    role VARCHAR(100),
+    is_primary BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**PROJECT_SERVICE_DB:**
+```sql
+-- projects table
+CREATE TABLE projects (
+    id BIGSERIAL PRIMARY KEY,
+    company_id BIGINT NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    daily_rate DECIMAL(10,2),
+    hourly_rate DECIMAL(10,2),
+    currency VARCHAR(3) DEFAULT 'EUR',
+    start_date DATE,
+    end_date DATE,
+    estimated_hours INTEGER,
+    status VARCHAR(50) DEFAULT 'ACTIVE',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- project_tariffs table (for rate history)
+CREATE TABLE project_tariffs (
+    id BIGSERIAL PRIMARY KEY,
+    project_id BIGINT REFERENCES projects(id) ON DELETE CASCADE,
+    daily_rate DECIMAL(10,2),
+    hourly_rate DECIMAL(10,2),
+    currency VARCHAR(3) DEFAULT 'EUR',
+    effective_from DATE NOT NULL,
+    effective_to DATE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**TASK_SERVICE_DB:**
+```sql
+-- tasks table
+CREATE TABLE tasks (
+    id BIGSERIAL PRIMARY KEY,
+    project_id BIGINT NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    ticket_id VARCHAR(100),
+    start_date DATE NOT NULL,
+    end_date DATE,
+    hours_worked DECIMAL(5,2) NOT NULL,
+    is_billed BOOLEAN DEFAULT FALSE,
+    is_paid BOOLEAN DEFAULT FALSE,
+    billing_date DATE,
+    payment_date DATE,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- time_entries table (for detailed time tracking)
+CREATE TABLE time_entries (
+    id BIGSERIAL PRIMARY KEY,
+    task_id BIGINT REFERENCES tasks(id) ON DELETE CASCADE,
+    start_time TIMESTAMP NOT NULL,
+    end_time TIMESTAMP,
+    hours DECIMAL(5,2),
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**ANALYTICS_SERVICE_DB:**
+```sql
+-- earnings_summary table
+CREATE TABLE earnings_summary (
+    id BIGSERIAL PRIMARY KEY,
+    year INTEGER NOT NULL,
+    month INTEGER NOT NULL,
+    company_id BIGINT,
+    project_id BIGINT,
+    total_hours DECIMAL(8,2),
+    total_earnings DECIMAL(12,2),
+    billed_amount DECIMAL(12,2),
+    paid_amount DECIMAL(12,2),
+    currency VARCHAR(3) DEFAULT 'EUR',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- billing_reports table
+CREATE TABLE billing_reports (
+    id BIGSERIAL PRIMARY KEY,
+    report_type VARCHAR(50) NOT NULL,
+    period_start DATE NOT NULL,
+    period_end DATE NOT NULL,
+    data JSONB,
+    generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### Step 2: Company Service Development
+Create a Spring Boot 3 Company Service with the following requirements:
+
+**DEPENDENCIES:**
+```xml
+<dependencies>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-data-jpa</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-validation</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.postgresql</groupId>
+        <artifactId>postgresql</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.springdoc</groupId>
+        <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+    </dependency>
+</dependencies>
+```
+
+**ENDPOINTS:**
+- `GET /api/companies` - Get all companies with pagination
+- `POST /api/companies` - Create new company
+- `GET /api/companies/{id}` - Get company by ID
+- `PUT /api/companies/{id}` - Update company
+- `DELETE /api/companies/{id}` - Delete company
+- `GET /api/companies/{id}/contacts` - Get company contacts
+- `POST /api/companies/{id}/contacts` - Add company contact
+- `PUT /api/companies/{id}/contacts/{contactId}` - Update contact
+- `DELETE /api/companies/{id}/contacts/{contactId}` - Delete contact
+- `GET /api/companies/search` - Search companies by name/email
+
+**FEATURES TO IMPLEMENT:**
+1. Company CRUD operations with validation
+2. Contact management system
+3. Company status management
+4. Search and filtering capabilities
+5. Pagination and sorting
+6. Exception handling and validation
+7. API documentation with OpenAPI 3
+
+### Step 3: Project Service Development
+Create a Spring Boot 3 Project Service with these specifications:
+
+**FEATURES:**
+1. Project CRUD operations with company relationship
+2. Tariff management with rate history
+3. Project status tracking
+4. Integration with Company Service
+5. Project search and filtering
+6. Currency support
+
+**ENDPOINTS:**
+- `GET /api/projects` - Get paginated projects with filters
+- `POST /api/projects` - Create new project
+- `GET /api/projects/{id}` - Get project by ID
+- `PUT /api/projects/{id}` - Update project
+- `DELETE /api/projects/{id}` - Delete project
+- `GET /api/projects/company/{companyId}` - Get projects by company
+- `POST /api/projects/{id}/tariffs` - Add new tariff rate
+- `GET /api/projects/{id}/tariffs` - Get tariff history
+- `PUT /api/projects/{id}/tariffs/{tariffId}` - Update tariff
+- `GET /api/projects/{id}/summary` - Get project summary with stats
+
+**VALIDATION:**
+- Required fields validation
+- Rate validation (positive numbers)
+- Date validation (end date after start date)
+- Currency format validation
+- Company existence validation
+
+### Step 4: Task Service Development
+Create a Spring Boot 3 Task Service for time and billing management:
+
+**FEATURES:**
+1. Task CRUD operations with time tracking
+2. Billing status management
+3. Payment tracking
+4. Time entry management
+5. Task validation and business logic
+6. Integration with Project Service
+
+**ENDPOINTS:**
+- `GET /api/tasks` - Get paginated tasks with filters
+- `POST /api/tasks` - Create new task
+- `GET /api/tasks/{id}` - Get task by ID
+- `PUT /api/tasks/{id}` - Update task
+- `DELETE /api/tasks/{id}` - Delete task
+- `GET /api/tasks/project/{projectId}` - Get tasks by project
+- `POST /api/tasks/{id}/time-entries` - Add time entry
+- `GET /api/tasks/{id}/time-entries` - Get time entries
+- `PUT /api/tasks/{id}/billing-status` - Update billing status
+- `PUT /api/tasks/{id}/payment-status` - Update payment status
+- `GET /api/tasks/unbilled` - Get unbilled tasks
+- `GET /api/tasks/unpaid` - Get unpaid tasks
+
+**FILTERS:**
+- Date range
+- Project
+- Billing status
+- Payment status
+- Company (via project relationship)
+
+**CALCULATIONS:**
+- Total hours worked
+- Earnings calculation based on project rates
+- Time validation (end date after start date)
+- Overlapping tasks detection
+
+### Step 5: Analytics Service Development
+Create a Spring Boot 3 Analytics Service for business insights:
+
+**FEATURES:**
+1. Earnings calculations and summaries
+2. Time tracking analytics
+3. Billing status reports
+4. Payment tracking
+5. Monthly/yearly overviews
+6. Company and project performance metrics
+
+**ENDPOINTS:**
+- `GET /api/analytics/dashboard` - Dashboard summary data
+- `GET /api/analytics/earnings` - Earnings analysis with filters
+- `GET /api/analytics/time-tracking` - Time tracking statistics
+- `GET /api/analytics/billing-summary` - Billing status overview
+- `GET /api/analytics/company/{companyId}/stats` - Company-specific analytics
+- `GET /api/analytics/project/{projectId}/stats` - Project-specific analytics
+- `GET /api/analytics/reports/{type}` - Generate reports (monthly, yearly, company)
+- `POST /api/analytics/reports/custom` - Generate custom reports
+- `GET /api/analytics/trends` - Earnings and time trends
+
+**CALCULATIONS:**
+- Total earnings by period
+- Average hourly/daily rates
+- Billing efficiency (billed vs worked hours)
+- Payment delays analysis
+- Company profitability metrics
+- Project ROI calculations
+
+### Step 6: React Frontend Development
+Create a modern React application with TypeScript:
+
+**SETUP:**
+```bash
+npx create-react-app freelancer-management --template typescript
+cd freelancer-management
+npm install axios react-router-dom recharts @tailwindcss/forms lucide-react
+npm install -D tailwindcss postcss autoprefixer
+```
+
+**COMPONENTS STRUCTURE:**
+```
+src/
+├── components/
+│   ├── common/ (Button, Input, Modal, Loading, DataTable)
+│   ├── companies/ (CompanyList, CompanyForm, CompanyCard)
+│   ├── projects/ (ProjectList, ProjectForm, TariffManager)
+│   ├── tasks/ (TaskList, TaskForm, TimeTracker, BillingStatus)
+│   ├── analytics/ (Dashboard, Charts, Reports)
+│   └── ai-chat/ (ChatInterface, CommandProcessor)
+├── pages/
+│   ├── Companies.tsx
+│   ├── Projects.tsx
+│   ├── Tasks.tsx
+│   ├── Analytics.tsx
+│   └── Dashboard.tsx
+├── hooks/
+│   ├── useCompanies.ts
+│   ├── useProjects.ts
+│   ├── useTasks.ts
+│   └── useAnalytics.ts
+├── services/
+│   ├── api.ts
+│   ├── companyService.ts
+│   ├── projectService.ts
+│   ├── taskService.ts
+│   └── analyticsService.ts
+├── types/
+│   ├── Company.ts
+│   ├── Project.ts
+│   ├── Task.ts
+│   └── Analytics.ts
+└── utils/
+    ├── dateUtils.ts
+    ├── currencyUtils.ts
+    └── validationUtils.ts
+```
+
+**KEY FEATURES:**
+1. Company management interface
+2. Project management with tariff settings
+3. Task management with time tracking
+4. Billing and payment status management
+5. Analytics dashboard with charts
+6. AI chat integration for natural language commands
+7. Responsive design with mobile support
+8. Form validation and error handling
+9. Real-time updates and notifications
+10. Export functionality for reports
+
+**CHARTS & VISUALIZATIONS:**
+- Earnings by company (pie chart)
+- Monthly earnings trends (line chart)
+- Task completion progress (progress bars)
+- Billing status overview (bar chart)
+- Time distribution by project (donut chart)
+- Payment status tracking (timeline)
+
+### Step 7: Python AI Agent Development
+Create a Python AI Agent with FastAPI:
+
+**SETUP:**
+```python
+# requirements.txt
+fastapi==0.104.1
+uvicorn==0.24.0
+openai==1.3.5
+sqlalchemy==2.0.23
+pandas==2.1.3
+numpy==1.25.2
+httpx==0.25.2
+python-jose==3.3.0
+python-multipart==0.0.6
+pydantic==2.5.0
+```
+
+**FEATURES:**
+1. Natural language command processing
+2. Entity extraction (company, project, task names)
+3. Command execution via API calls
+4. Context-aware conversations
+5. Work analytics and insights
+
+**API ENDPOINTS:**
+- `POST /api/ai/chat` - Process natural language commands
+- `POST /api/ai/execute` - Execute structured commands
+- `GET /api/ai/insights` - Generate work insights
+- `POST /api/ai/analyze-patterns` - Analyze work patterns
+
+**AI CAPABILITIES:**
+- Create companies: "Create a new company called ABC Corp"
+- Create projects: "Create project Mobile App for ABC Corp with daily rate 400 euros"
+- Create tasks: "Add task 'Bug fixing' for Mobile App project, worked 3 hours today, ticket #123"
+- Query data: "How much did I earn from ABC Corp last month?"
+- Billing reminders: "Which tasks haven't been billed yet?"
+- Analytics: "Show me my most profitable projects"
+
+**COMMAND PATTERNS:**
+```python
+COMMAND_PATTERNS = {
+    "create_company": [
+        "create company {name}",
+        "add new company {name}",
+        "new company called {name}"
+    ],
+    "create_project": [
+        "create project {name} for {company}",
+        "new project {name} at {company} with rate {rate}",
+        "add project {name} for company {company}"
+    ],
+    "create_task": [
+        "add task {name} for project {project}",
+        "worked on {task} for {hours} hours",
+        "log {hours} hours on {task} with ticket {ticket}"
+    ]
+}
+```
+
+### Step 8: Docker Configuration
+Create Docker setup for all services:
+
+**STRUCTURE:**
+```
+project-root/
+├── docker-compose.yml
+├── docker-compose.dev.yml
+├── company-service/
+│   ├── Dockerfile
+│   └── src/
+├── project-service/
+│   ├── Dockerfile
+│   └── src/
+├── task-service/
+│   ├── Dockerfile
+│   └── src/
+├── analytics-service/
+│   ├── Dockerfile
+│   └── src/
+├── ai-agent/
+│   ├── Dockerfile
+│   ├── requirements.txt
+│   └── src/
+├── frontend/
+│   ├── Dockerfile
+│   └── src/
+└── nginx/
+    └── nginx.conf
+```
+
+**DOCKER-COMPOSE SERVICES:**
+- `postgres-company-db` (port 5432)
+- `postgres-project-db` (port 5433)
+- `postgres-task-db` (port 5434)
+- `postgres-analytics-db` (port 5435)
+- `company-service` (port 8081)
+- `project-service` (port 8082)
+- `task-service` (port 8083)
+- `analytics-service` (port 8084)
+- `ai-agent` (port 8000)
+- `frontend` (port 3000)
+- `nginx` (port 80)
+
+**ENVIRONMENT VARIABLES:**
+```yaml
+# Common environment variables
+DATABASE_URL: "postgresql://user:password@host:port/database"
+JWT_SECRET: "your-jwt-secret"
+OPENAI_API_KEY: "your-openai-key"
+CORS_ORIGINS: "http://localhost:3000"
+```
+
+### Step 9: API Integration & Testing
+Create comprehensive integration between all components:
+
+**SERVICE COMMUNICATION:**
+- Frontend → Backend APIs (REST with Axios)
+- AI Agent → Backend APIs (HTTP client)
+- Inter-service communication (OpenFeign)
+- Database connections and migrations
+
+**TESTING REQUIREMENTS:**
+1. Unit tests for each service (JUnit 5, pytest)
+2. Integration tests for API endpoints
+3. End-to-end tests for critical workflows
+4. AI command processing tests
+5. Database integration tests
+
+**ERROR HANDLING:**
+- Global exception handlers in each service
+- Consistent error response format
+- Frontend error boundaries
+- AI command fallback mechanisms
+- Database connection retry logic
+
+### Step 10: Deployment Instructions
+
+**LOCAL DEVELOPMENT:**
+1. Clone repository and setup environment
+2. Configure environment variables
+3. Start PostgreSQL databases
+4. Run database migrations
+5. Start backend services in order
+6. Start AI agent
+7. Start React development server
+8. Access application at http://localhost:3000
+
+**PRODUCTION DEPLOYMENT:**
+1. Configure production environment variables
+2. Setup CI/CD pipeline (GitHub Actions)
+3. Configure container registry
+4. Setup monitoring and logging
+5. Configure SSL certificates
+6. Deploy with Docker Compose or Kubernetes
+7. Setup backup strategies for databases
+
+## Implementation Order
+1. **Week 1-2:** Database schemas and Company Service
+2. **Week 3:** Project Service development
+3. **Week 4:** Task Service development
+4. **Week 5:** Analytics Service development
+5. **Week 6-7:** React Frontend development
+6. **Week 8:** Python AI Agent development
+7. **Week 9:** Docker configuration and integration
+8. **Week 10:** Testing, debugging, and deployment
+
+This comprehensive guide provides detailed steps for each component. Start with the database schema, then build services incrementally, and finally integrate everything with Docker and AI capabilities.

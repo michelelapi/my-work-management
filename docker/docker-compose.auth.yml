@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  auth-service-db:
+    image: postgres:15
+    container_name: auth-service-db
+    ports:
+      - "5434:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=auth_service_db
+    volumes:
+      - ../backend/auth-service/src/main/resources/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - auth-service-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  auth-service-data: 

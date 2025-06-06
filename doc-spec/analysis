@@ -3,6 +3,9 @@
 ## Project Overview
 Build a comprehensive work management platform for self-employed professionals with React frontend, Spring Boot microservices backend, Python AI agent, and full Docker containerization.
 
+## NOTES
+- REMEMBER WE ARE IN WINDOWS 10
+
 ## Application Architecture
 
 ### Frontend (React)
@@ -20,27 +23,21 @@ Build a comprehensive work management platform for self-employed professionals w
 ### Backend Microservices (Spring Boot)
 
 #### 1. Company Service (Port 8081)
-**Responsibilities:**
+- This service will manage the companies and contacts information,
+the project and tasks information
+**Company Responsibilities:**
 - Company CRUD operations
 - Company profile management
 - Contact information and details
 - Company-specific settings
 - Integration with Project Service
-
-**Tech Stack:** Spring Boot 3, Spring Data JPA, PostgreSQL, Spring Validation
-
-#### 2. Project Service (Port 8082)
-**Responsibilities:**
+**Project Responsibilities:**
 - Project CRUD operations
 - Project-company relationships
 - Tariff management (daily/hourly rates)
 - Project status tracking
 - Integration with Company and Task Services
-
-**Tech Stack:** Spring Boot 3, Spring Data JPA, PostgreSQL, Spring Cloud OpenFeign
-
-#### 3. Task Service (Port 8083)
-**Responsibilities:**
+**Task Responsibilities:**
 - Task CRUD operations with time tracking
 - Billing status management
 - Payment status tracking
@@ -112,11 +109,7 @@ CREATE TABLE company_contacts (
     is_primary BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-```
 
-**PROJECT_SERVICE_DB:**
-```sql
--- projects table
 CREATE TABLE projects (
     id BIGSERIAL PRIMARY KEY,
     company_id BIGINT NOT NULL,
@@ -144,11 +137,7 @@ CREATE TABLE project_tariffs (
     effective_to DATE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-```
 
-**TASK_SERVICE_DB:**
-```sql
--- tasks table
 CREATE TABLE tasks (
     id BIGSERIAL PRIMARY KEY,
     project_id BIGINT NOT NULL,

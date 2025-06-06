@@ -1,0 +1,337 @@
+-- =====================================================
+-- IMPROVED DATABASE SCHEMA FOR FREELANCER MANAGEMENT
+-- =====================================================
+
+-- Create ENUM types for better data consistency
+CREATE TYPE company_status AS ENUM ('ACTIVE', 'INACTIVE', 'ARCHIVED');
+CREATE TYPE project_status AS ENUM ('ACTIVE', 'COMPLETED', 'ON_HOLD', 'CANCELLED');
+CREATE TYPE rate_type AS ENUM ('DAILY', 'HOURLY');
+
+-- =====================================================
+-- COMPANIES TABLE
+-- =====================================================
+CREATE TABLE companies (
+    id BIGSERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    contact_person VARCHAR(255),
+    email VARCHAR(255),
+    phone VARCHAR(50),
+    address TEXT,
+    website VARCHAR(255),
+    tax_id VARCHAR(100),
+    payment_terms INTEGER DEFAULT 30,
+    status company_status DEFAULT 'ACTIVE',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Constraints
+    CONSTRAINT uk_companies_name UNIQUE (name),
+    CONSTRAINT uk_companies_tax_id UNIQUE (tax_id),
+    CONSTRAINT chk_companies_email CHECK (
+        email IS NULL OR 
+        email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'
+    ),
+    CONSTRAINT chk_companies_payment_terms CHECK (payment_terms > 0)
+);
+
+-- =====================================================
+-- COMPANY CONTACTS TABLE
+-- =====================================================
+CREATE TABLE company_contacts (
+    id BIGSERIAL PRIMARY KEY,
+    company_id BIGINT NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255),
+    phone VARCHAR(50),
+    role VARCHAR(100),
+    is_primary BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Foreign Key
+    CONSTRAINT fk_contacts_company 
+        FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
+    
+    -- Constraints
+    CONSTRAINT chk_contacts_email CHECK (
+        email IS NULL OR 
+        email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'
+    )
+);
+
+-- Unique constraint for primary contact per company
+CREATE UNIQUE INDEX uk_company_primary_contact 
+    ON company_contacts (company_id) WHERE is_primary = true;
+
+-- =====================================================
+-- PROJECTS TABLE
+-- =====================================================
+CREATE TABLE projects (
+    id BIGSERIAL PRIMARY KEY,
+    company_id BIGINT NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    daily_rate DECIMAL(10,2),
+    hourly_rate DECIMAL(10,2),
+    currency VARCHAR(3) DEFAULT 'EUR',
+    start_date DATE,
+    end_date DATE,
+    estimated_hours INTEGER,
+    status project_status DEFAULT 'ACTIVE',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Foreign Key
+    CONSTRAINT fk_projects_company 
+        FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE RESTRICT,
+    
+    -- Unique constraint for project name within company
+    CONSTRAINT uk_projects_company_name UNIQUE (company_id, name),
+    
+    -- Check constraints
+    CONSTRAINT chk_projects_daily_rate CHECK (daily_rate IS NULL OR daily_rate > 0),
+    CONSTRAINT chk_projects_hourly_rate CHECK (hourly_rate IS NULL OR hourly_rate > 0),
+    CONSTRAINT chk_projects_rate_required CHECK (
+        daily_rate IS NOT NULL OR hourly_rate IS NOT NULL
+    ),
+    CONSTRAINT chk_projects_dates CHECK (
+        end_date IS NULL OR end_date >= start_date
+    ),
+    CONSTRAINT chk_projects_estimated_hours CHECK (
+        estimated_hours IS NULL OR estimated_hours > 0
+    ),
+    CONSTRAINT chk_projects_currency CHECK (
+        currency ~ '^[A-Z]{3}$'
+    )
+);
+
+-- =====================================================
+-- PROJECT TARIFFS TABLE (Rate History)
+-- =====================================================
+CREATE TABLE project_tariffs (
+    id BIGSERIAL PRIMARY KEY,
+    project_id BIGINT NOT NULL,
+    daily_rate DECIMAL(10,2),
+    hourly_rate DECIMAL(10,2),
+    currency VARCHAR(3) DEFAULT 'EUR',
+    effective_from DATE NOT NULL,
+    effective_to DATE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Foreign Key
+    CONSTRAINT fk_tariffs_project 
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    
+    -- Check constraints
+    CONSTRAINT chk_tariffs_daily_rate CHECK (daily_rate IS NULL OR daily_rate > 0),
+    CONSTRAINT chk_tariffs_hourly_rate CHECK (hourly_rate IS NULL OR hourly_rate > 0),
+    CONSTRAINT chk_tariffs_rate_required CHECK (
+        daily_rate IS NOT NULL OR hourly_rate IS NOT NULL
+    ),
+    CONSTRAINT chk_tariffs_dates CHECK (
+        effective_to IS NULL OR effective_to >= effective_from
+    ),
+    CONSTRAINT chk_tariffs_currency CHECK (
+        currency ~ '^[A-Z]{3}$'
+    )
+);
+
+-- =====================================================
+-- TASKS TABLE
+-- =====================================================
+CREATE TABLE tasks (
+    id BIGSERIAL PRIMARY KEY,
+    project_id BIGINT NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    ticket_id VARCHAR(100),
+    start_date DATE NOT NULL,
+    end_date DATE,
+    hours_worked DECIMAL(5,2) NOT NULL,
+    rate_used DECIMAL(10,2),
+    rate_type rate_type,
+    currency VARCHAR(3) DEFAULT 'EUR',
+    is_billed BOOLEAN DEFAULT FALSE,
+    is_paid BOOLEAN DEFAULT FALSE,
+    billing_date DATE,
+    payment_date DATE,
+    invoice_id VARCHAR(100),
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Foreign Key
+    CONSTRAINT fk_tasks_project 
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE RESTRICT,
+    
+    -- Check constraints
+    CONSTRAINT chk_tasks_hours CHECK (hours_worked > 0),
+    CONSTRAINT chk_tasks_rate_used CHECK (rate_used IS NULL OR rate_used > 0),
+    CONSTRAINT chk_tasks_dates CHECK (
+        end_date IS NULL OR end_date >= start_date
+    ),
+    CONSTRAINT chk_tasks_payment_after_billing CHECK (
+        payment_date IS NULL OR billing_date IS NULL OR payment_date >= billing_date
+    ),
+    CONSTRAINT chk_tasks_billed_before_paid CHECK (
+        NOT is_paid OR is_billed
+    ),
+    CONSTRAINT chk_tasks_billing_date_when_billed CHECK (
+        NOT is_billed OR billing_date IS NOT NULL
+    ),
+    CONSTRAINT chk_tasks_payment_date_when_paid CHECK (
+        NOT is_paid OR payment_date IS NOT NULL
+    ),
+    CONSTRAINT chk_tasks_currency CHECK (
+        currency ~ '^[A-Z]{3}$'
+    )
+);
+
+-- =====================================================
+-- TIME ENTRIES TABLE (Detailed Time Tracking)
+-- =====================================================
+CREATE TABLE time_entries (
+    id BIGSERIAL PRIMARY KEY,
+    task_id BIGINT NOT NULL,
+    start_time TIMESTAMP NOT NULL,
+    end_time TIMESTAMP,
+    hours DECIMAL(5,2),
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Foreign Key
+    CONSTRAINT fk_time_entries_task 
+        FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+    
+    -- Check constraints
+    CONSTRAINT chk_time_entries_hours CHECK (hours IS NULL OR hours > 0),
+    CONSTRAINT chk_time_entries_times CHECK (
+        end_time IS NULL OR end_time > start_time
+    )
+);
+
+-- =====================================================
+-- INDEXES FOR PERFORMANCE
+-- =====================================================
+
+-- Companies indexes
+CREATE INDEX idx_companies_status ON companies(status);
+CREATE INDEX idx_companies_name ON companies(name);
+
+-- Company contacts indexes
+CREATE INDEX idx_contacts_company_id ON company_contacts(company_id);
+CREATE INDEX idx_contacts_email ON company_contacts(email);
+
+-- Projects indexes
+CREATE INDEX idx_projects_company_id ON projects(company_id);
+CREATE INDEX idx_projects_status ON projects(status);
+CREATE INDEX idx_projects_dates ON projects(start_date, end_date);
+
+-- Project tariffs indexes
+CREATE INDEX idx_tariffs_project_id ON project_tariffs(project_id);
+CREATE INDEX idx_tariffs_effective_dates ON project_tariffs(effective_from, effective_to);
+
+-- Tasks indexes
+CREATE INDEX idx_tasks_project_id ON tasks(project_id);
+CREATE INDEX idx_tasks_dates ON tasks(start_date, end_date);
+CREATE INDEX idx_tasks_billing_status ON tasks(is_billed, is_paid);
+CREATE INDEX idx_tasks_billing_date ON tasks(billing_date);
+CREATE INDEX idx_tasks_payment_date ON tasks(payment_date);
+CREATE INDEX idx_tasks_ticket_id ON tasks(ticket_id);
+
+-- Time entries indexes
+CREATE INDEX idx_time_entries_task_id ON time_entries(task_id);
+CREATE INDEX idx_time_entries_times ON time_entries(start_time, end_time);
+
+-- =====================================================
+-- TRIGGERS FOR AUTOMATIC UPDATES
+-- =====================================================
+
+-- Function to update updated_at column
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- Apply triggers to tables with updated_at
+CREATE TRIGGER update_companies_updated_at 
+    BEFORE UPDATE ON companies
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_projects_updated_at 
+    BEFORE UPDATE ON projects
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_tasks_updated_at 
+    BEFORE UPDATE ON tasks
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- =====================================================
+-- SAMPLE DATA FOR TESTING
+-- =====================================================
+
+-- Insert sample company
+INSERT INTO companies (name, description, email, contact_person, payment_terms) 
+VALUES ('TechCorp Solutions', 'Software development company', 'contact@techcorp.com', 'John Smith', 30);
+
+-- Insert sample project
+INSERT INTO projects (company_id, name, description, daily_rate, hourly_rate, start_date) 
+VALUES (1, 'Mobile App Development', 'iOS and Android app development', 400.00, 50.00, CURRENT_DATE);
+
+-- Insert sample task
+INSERT INTO tasks (project_id, title, description, start_date, hours_worked, rate_used, rate_type) 
+VALUES (1, 'Initial Setup', 'Project setup and configuration', CURRENT_DATE, 4.5, 50.00, 'HOURLY');
+
+-- =====================================================
+-- USEFUL VIEWS FOR COMMON QUERIES
+-- =====================================================
+
+-- View for project earnings
+CREATE VIEW project_earnings AS
+SELECT 
+    p.id as project_id,
+    p.name as project_name,
+    c.name as company_name,
+    SUM(t.hours_worked * COALESCE(t.rate_used, p.hourly_rate, p.daily_rate)) as total_earnings,
+    SUM(t.hours_worked) as total_hours,
+    COUNT(t.id) as total_tasks,
+    COUNT(CASE WHEN t.is_billed THEN 1 END) as billed_tasks,
+    COUNT(CASE WHEN t.is_paid THEN 1 END) as paid_tasks
+FROM projects p
+JOIN companies c ON p.company_id = c.id
+LEFT JOIN tasks t ON p.id = t.project_id
+GROUP BY p.id, p.name, c.name;
+
+-- View for unbilled work
+CREATE VIEW unbilled_work AS
+SELECT 
+    t.id,
+    t.title,
+    p.name as project_name,
+    c.name as company_name,
+    t.hours_worked,
+    t.start_date,
+    t.hours_worked * COALESCE(t.rate_used, p.hourly_rate, p.daily_rate) as amount
+FROM tasks t
+JOIN projects p ON t.project_id = p.id
+JOIN companies c ON p.company_id = c.id
+WHERE t.is_billed = FALSE;
+
+-- =====================================================
+-- COMMENTS FOR DOCUMENTATION
+-- =====================================================
+
+COMMENT ON TABLE companies IS 'Client companies that hire the freelancer';
+COMMENT ON TABLE company_contacts IS 'Contact persons within each company';
+COMMENT ON TABLE projects IS 'Work projects for each company with rate information';
+COMMENT ON TABLE project_tariffs IS 'Historical rates for projects to track rate changes';
+COMMENT ON TABLE tasks IS 'Individual work tasks with time tracking and billing status';
+COMMENT ON TABLE time_entries IS 'Detailed time entries for precise time tracking within tasks';
+
+COMMENT ON COLUMN companies.payment_terms IS 'Number of days for payment (e.g., 30 for NET-30)';
+COMMENT ON COLUMN tasks.rate_used IS 'The actual rate used for this task (for historical accuracy)';
+COMMENT ON COLUMN tasks.rate_type IS 'Whether the rate_used is DAILY or HOURLY';
+COMMENT ON COLUMN project_tariffs.effective_to IS 'NULL means this rate is currently active';

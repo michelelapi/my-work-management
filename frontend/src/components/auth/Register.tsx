@@ -1,17 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { RegisterCredentials } from '../../types/auth';
 
 const Register: React.FC = () => {
   const navigate = useNavigate();
-  const { register, error, isLoading } = useAuth();
+  const { register, error, isLoading, isAuthenticated } = useAuth();
   const [formData, setFormData] = useState<RegisterCredentials>({
     email: '',
     password: '',
     firstName: '',
     lastName: '',
   });
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/dashboard');
+    }
+  }, [isAuthenticated, navigate]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;

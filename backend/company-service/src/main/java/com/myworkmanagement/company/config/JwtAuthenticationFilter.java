@@ -18,6 +18,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import javax.crypto.SecretKey;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -34,14 +35,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                   FilterChain filterChain) throws ServletException, IOException {
         
         String authHeader = request.getHeader("Authorization");
+        logger.info("Processing request to: " + request.getRequestURI());
         
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            logger.warn("No Bearer token found in request");
             filterChain.doFilter(request, response);
             return;
         }
 
         try {
             String jwt = authHeader.substring(7);
+            logger.info("JWT token received: " + jwt.substring(0, 20) + "...");
+            
             SecretKey key = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
             
             Claims claims = Jwts.parserBuilder()
@@ -51,12 +56,24 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     .getBody();
 
             String username = claims.getSubject();
-            @SuppressWarnings("unchecked")
-            List<String> authorities = claims.get("authorities", List.class);
-
-            List<SimpleGrantedAuthority> grantedAuthorities = authorities.stream()
-                    .map(SimpleGrantedAuthority::new)
-                    .collect(Collectors.toList());
+            logger.info("Username from token: " + username);
+            
+            // Handle authorities safely
+            List<SimpleGrantedAuthority> grantedAuthorities = new ArrayList<>();
+            if (claims.get("authorities") != null) {
+                @SuppressWarnings("unchecked")
+                List<String> authorities = claims.get("authorities", List.class);
+                if (authorities != null) {
+                    grantedAuthorities = authorities.stream()
+                            .map(SimpleGrantedAuthority::new)
+                            .collect(Collectors.toList());
+                    logger.info("Authorities found: " + grantedAuthorities);
+                } else {
+                    logger.warn("Authorities claim is null");
+                }
+            } else {
+                logger.warn("No authorities claim found in token");
+            }
 
             UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
                     username,
@@ -65,9 +82,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             );
 
             SecurityContextHolder.getContext().setAuthentication(auth);
+            logger.info("Authentication set in SecurityContext");
             
         } catch (Exception e) {
-            logger.error("Cannot set user authentication: {}", e);
+            logger.error("Cannot set user authentication: " + e.getMessage(), e);
+            SecurityContextHolder.clearContext();
         }
 
         filterChain.doFilter(request, response);

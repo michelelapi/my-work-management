@@ -29,4 +29,6 @@ public interface CompanyRepository extends JpaRepository<Company, Long> {
     boolean existsByEmail(String email);
     
     boolean existsByTaxId(String taxId);
+
+    Page<Company> findAllByUserEmail(String userEmail, Pageable pageable);
 } 

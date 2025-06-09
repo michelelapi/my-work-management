@@ -14,7 +14,7 @@ const initialState: AuthState = {
   user: null,
   token: null,
   isAuthenticated: false,
-  isLoading: false, // Set initial isLoading to false
+  isLoading: false, // Set initial isLoading to true to hold route during auth initialization
   error: null,
 };
 

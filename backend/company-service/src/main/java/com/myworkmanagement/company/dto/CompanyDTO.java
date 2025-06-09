@@ -36,4 +36,6 @@ public class CompanyDTO {
     private CompanyStatus status;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private String userEmail;
+
 } 

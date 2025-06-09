@@ -21,13 +21,16 @@ const Header: React.FC = () => {
             {user ? (
               <>
                 <li>
+                  <Link to="/companies" className="hover:text-gray-300">Company</Link>
+                </li>
+                <li>
                   <button onClick={logout} className="hover:text-gray-300 focus:outline-none">
                     Logout
                   </button>
                 </li>
                 <li>
                   <button onClick={toggleTheme} className="hover:text-gray-300 focus:outline-none">
-                    Switch to {theme === 'light' ? 'Ddark' : 'Light'} Mode
+                    Switch to {theme === 'light' ? 'Dark' : 'Light'} Mode
                   </button>
                 </li>
               </>

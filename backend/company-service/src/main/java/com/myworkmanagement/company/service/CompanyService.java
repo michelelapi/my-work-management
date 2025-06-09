@@ -7,6 +7,8 @@ import org.springframework.data.domain.Pageable;
 public interface CompanyService {
     Page<CompanyDTO> getAllCompanies(Pageable pageable);
     
+    Page<CompanyDTO> getAllCompaniesByUserEmail(String userEmail, Pageable pageable);
+    
     CompanyDTO getCompanyById(Long id);
     
     CompanyDTO createCompany(CompanyDTO companyDTO);

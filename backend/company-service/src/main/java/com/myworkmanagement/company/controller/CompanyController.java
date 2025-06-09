@@ -17,6 +17,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -29,7 +31,7 @@ public class CompanyController {
     private final CompanyService companyService;
 
     @GetMapping
-    @Operation(summary = "Get all companies", description = "Retrieves a paginated list of all companies")
+    @Operation(summary = "Get all companies", description = "Retrieves a paginated list of all companies for the authenticated user")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Successfully retrieved companies"),
         @ApiResponse(responseCode = "401", description = "Unauthorized"),
@@ -37,7 +39,9 @@ public class CompanyController {
     })
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
     public ResponseEntity<Page<CompanyDTO>> getAllCompanies(Pageable pageable) {
-        return ResponseEntity.ok(companyService.getAllCompanies(pageable));
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String userEmail = authentication.getName(); // Assuming the principal name is the email
+        return ResponseEntity.ok(companyService.getAllCompaniesByUserEmail(userEmail, pageable));
     }
 
     @GetMapping("/{id}")
@@ -67,6 +71,9 @@ public class CompanyController {
     public ResponseEntity<CompanyDTO> createCompany(
             @Parameter(description = "Company data", required = true)
             @Valid @RequestBody CompanyDTO companyDTO) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String userEmail = authentication.getName();
+        companyDTO.setUserEmail(userEmail);
         return new ResponseEntity<>(companyService.createCompany(companyDTO), HttpStatus.CREATED);
     }
 

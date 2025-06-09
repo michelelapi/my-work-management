@@ -1,11 +1,10 @@
 import axios from 'axios';
 import { LoginCredentials, RegisterCredentials, AuthResponse } from '../types/auth';
-
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8082/api';
+import config from '../config';
 
 const authService = {
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
-    const response = await axios.post(`${API_URL}/auth/login`, credentials);
+    const response = await axios.post(`${config.api.baseUrl}/api/auth/login`, credentials);
     if (response.data.token) {
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('user', JSON.stringify(response.data.user));
@@ -14,7 +13,7 @@ const authService = {
   },
 
   async register(credentials: RegisterCredentials): Promise<AuthResponse> {
-    const response = await axios.post(`${API_URL}/auth/register`, credentials);
+    const response = await axios.post(`${config.api.baseUrl}/api/auth/register`, credentials);
     if (response.data.token) {
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('user', JSON.stringify(response.data.user));

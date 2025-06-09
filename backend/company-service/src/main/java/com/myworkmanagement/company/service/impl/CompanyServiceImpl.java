@@ -28,6 +28,13 @@ public class CompanyServiceImpl implements CompanyService {
 
     @Override
     @Transactional(readOnly = true)
+    public Page<CompanyDTO> getAllCompaniesByUserEmail(String userEmail, Pageable pageable) {
+        return companyRepository.findAllByUserEmail(userEmail, pageable)
+                .map(this::mapToDTO);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public CompanyDTO getCompanyById(Long id) {
         return companyRepository.findById(id)
                 .map(this::mapToDTO)
@@ -138,6 +145,7 @@ public class CompanyServiceImpl implements CompanyService {
         if (dto.getStatus() != null) {
             company.setStatus(dto.getStatus());
         }
+        company.setUserEmail(dto.getUserEmail());
     }
 
     private CompanyDTO mapToDTO(Company company) {
@@ -155,6 +163,7 @@ public class CompanyServiceImpl implements CompanyService {
                 .status(company.getStatus())
                 .createdAt(company.getCreatedAt())
                 .updatedAt(company.getUpdatedAt())
+                .userEmail(company.getUserEmail())
                 .build();
     }
 
@@ -170,6 +179,7 @@ public class CompanyServiceImpl implements CompanyService {
                 .taxId(dto.getTaxId())
                 .paymentTerms(dto.getPaymentTerms())
                 .status(dto.getStatus())
+                .userEmail(dto.getUserEmail())
                 .build();
     }
 } 

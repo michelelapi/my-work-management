@@ -24,6 +24,9 @@ const Header: React.FC = () => {
                   <Link to="/companies" className="hover:text-gray-300">Company</Link>
                 </li>
                 <li>
+                  <Link to="/projects" className="hover:text-gray-300">Projects</Link>
+                </li>
+                <li>
                   <button onClick={logout} className="hover:text-gray-300 focus:outline-none">
                     Logout
                   </button>

@@ -109,6 +109,17 @@ const CompanyDetailsPage: React.FC = () => {
           </button>
         </div>
 
+        {/* Projects Section */}
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white">Projects</h2>
+          <button
+            onClick={() => navigate(`/companies/${company.id}/projects/new`)}
+            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md transition-colors"
+          >
+            Create New Project
+          </button>
+        </div>
+
         {contacts.length === 0 ? (
           <div className="text-center text-gray-500 dark:text-gray-400 mt-4">
             No contacts found. Add your first contact!

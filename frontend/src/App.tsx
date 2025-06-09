@@ -10,6 +10,8 @@ import CompanyDetailsPage from './pages/CompanyDetailsPage';
 import CompanyListPage from './pages/CompanyListPage';
 import CompanyFormPage from './pages/CompanyFormPage';
 import CompanyContactFormPage from './pages/CompanyContactFormPage';
+import ProjectListPage from './pages/ProjectListPage';
+import ProjectFormPage from './pages/ProjectFormPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
 function App() {
@@ -32,6 +34,12 @@ function App() {
                 
                 <Route path="/companies/:companyId/contacts/new" element={<ProtectedRoute><CompanyContactFormPage /></ProtectedRoute>} />
                 <Route path="/companies/:companyId/contacts/:contactId/edit" element={<ProtectedRoute><CompanyContactFormPage /></ProtectedRoute>} />
+
+                {/* Project Routes */}
+                <Route path="/projects" element={<ProtectedRoute><ProjectListPage /></ProtectedRoute>} />
+                <Route path="/companies/:companyId/projects" element={<ProtectedRoute><ProjectListPage /></ProtectedRoute>} />
+                <Route path="/companies/:companyId/projects/new" element={<ProtectedRoute><ProjectFormPage /></ProtectedRoute>} />
+                <Route path="/companies/:companyId/projects/:projectId/edit" element={<ProtectedRoute><ProjectFormPage /></ProtectedRoute>} />
 
                 <Route path="*" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               </Routes>

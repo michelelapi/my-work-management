@@ -9,6 +9,8 @@ const ProjectListPage: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
 
   const companyIdNum = companyId ? parseInt(companyId, 10) : undefined;
 
@@ -51,10 +53,22 @@ const ProjectListPage: React.FC = () => {
       }
       await projectService.deleteProject(projectToDelete.companyId, projectId);
       setProjects(prevProjects => prevProjects.filter(project => project.id !== projectId));
+      setDeleteModalOpen(false);
+      setProjectToDelete(null);
     } catch (err) {
       console.error('Error deleting project:', err);
       setError('Failed to delete project');
     }
+  };
+
+  const openDeleteModal = (project: Project) => {
+    setProjectToDelete(project);
+    setDeleteModalOpen(true);
+  };
+
+  const closeDeleteModal = () => {
+    setDeleteModalOpen(false);
+    setProjectToDelete(null);
   };
 
   if (isLoading) {
@@ -67,6 +81,41 @@ const ProjectListPage: React.FC = () => {
 
   return (
     <div className="container mx-auto p-4">
+      {/* Delete Confirmation Modal */}
+      {deleteModalOpen && projectToDelete && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center">
+          <div className="relative p-5 border w-96 shadow-lg rounded-md bg-white dark:bg-gray-800">
+            <div className="mt-3 text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900">
+                <svg className="h-6 w-6 text-red-600 dark:text-red-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </div>
+              <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white mt-2">Delete Project</h3>
+              <div className="mt-2 px-7 py-3">
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Are you sure you want to delete the project "{projectToDelete.name}"? This action cannot be undone.
+                </p>
+              </div>
+              <div className="flex justify-center space-x-4 mt-4">
+                <button
+                  onClick={closeDeleteModal}
+                  className="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleDeleteProject(projectToDelete.id!)}
+                  className="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
           {companyIdNum ? `Projects for Company ${companyIdNum}` : 'My Projects'}
@@ -135,7 +184,7 @@ const ProjectListPage: React.FC = () => {
                       Edit
                     </Link>
                     <button
-                      onClick={() => handleDeleteProject(project.id!)}
+                      onClick={() => openDeleteModal(project)}
                       className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
                     >
                       Delete

@@ -4,8 +4,11 @@ import com.myworkmanagement.company.entity.Task;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -38,4 +41,13 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     Page<Task> findByUserEmailAndIsPaidFalse(String userEmail, Pageable pageable);
     Page<Task> findByUserEmailAndProjectIdAndIsBilledFalse(String userEmail, Long projectId, Pageable pageable);
     Page<Task> findByUserEmailAndProjectIdAndIsPaidFalse(String userEmail, Long projectId, Pageable pageable);
+
+    @Query("SELECT COUNT(t) FROM Task t JOIN t.project p WHERE p.company.id = :companyId")
+    Long countByCompanyId(@Param("companyId") Long companyId);
+    
+    @Query("SELECT COALESCE(SUM(t.hoursWorked), 0) FROM Task t JOIN t.project p WHERE p.company.id = :companyId")
+    Integer sumHoursByCompanyId(@Param("companyId") Long companyId);
+    
+    @Query("SELECT COALESCE(SUM(t.rateUsed * t.hoursWorked), 0) FROM Task t JOIN t.project p WHERE p.company.id = :companyId")
+    BigDecimal sumAmountByCompanyId(@Param("companyId") Long companyId);
 } 

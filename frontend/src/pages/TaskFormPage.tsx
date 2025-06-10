@@ -31,6 +31,7 @@ const TaskFormPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
+    const [showConfirmModal, setShowConfirmModal] = useState(false);
 
     const isEditMode = !!taskId;
 
@@ -108,6 +109,10 @@ const TaskFormPage: React.FC = () => {
             return;
         }
 
+        setShowConfirmModal(true);
+    };
+
+    const handleConfirmSave = async () => {
         try {
             if (taskId) {
                 // Update existing task
@@ -124,6 +129,8 @@ const TaskFormPage: React.FC = () => {
         } catch (err) {
             setError('Failed to save task. Please try again later.');
             console.error('Error saving task:', err);
+        } finally {
+            setShowConfirmModal(false);
         }
     };
 
@@ -137,6 +144,43 @@ const TaskFormPage: React.FC = () => {
 
     return (
         <div className="container mx-auto p-4">
+            {/* Confirmation Modal */}
+            {showConfirmModal && (
+                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center">
+                    <div className="relative p-5 border w-96 shadow-lg rounded-md bg-white dark:bg-gray-800">
+                        <div className="mt-3 text-center">
+                            <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 dark:bg-green-900">
+                                <svg className="h-6 w-6 text-green-600 dark:text-green-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                                </svg>
+                            </div>
+                            <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white mt-2">
+                                {isEditMode ? 'Update Task' : 'Create Task'}
+                            </h3>
+                            <div className="mt-2 px-7 py-3">
+                                <p className="text-sm text-gray-500 dark:text-gray-400">
+                                    Are you sure you want to {isEditMode ? 'update' : 'create'} this task?
+                                </p>
+                            </div>
+                            <div className="flex justify-center space-x-4 mt-4">
+                                <button
+                                    onClick={() => setShowConfirmModal(false)}
+                                    className="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleConfirmSave}
+                                    className="px-4 py-2 bg-green-600 text-white text-base font-medium rounded-md shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+                                >
+                                    Confirm
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <h1 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
                 {isEditMode ? 'Edit Task' : 'Create New Task'}
             </h1>

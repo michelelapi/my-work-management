@@ -17,6 +17,8 @@ const ProjectDetailsPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isTasksExpanded, setIsTasksExpanded] = useState(true);
+  const [deleteTaskModalOpen, setDeleteTaskModalOpen] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
 
   // Load sections state from localStorage
   useEffect(() => {
@@ -77,17 +79,27 @@ const ProjectDetailsPage: React.FC = () => {
   }, [companyId, projectId]);
 
   const handleDeleteTask = async (taskId: number) => {
-    if (!companyId || !projectId || !window.confirm('Are you sure you want to delete this task?')) {
-      return;
-    }
+    if (!companyId || !projectId) return;
 
     try {
       await taskService.deleteTask(parseInt(projectId, 10), taskId);
       setTasks(tasks.filter(task => task.id !== taskId));
+      setDeleteTaskModalOpen(false);
+      setTaskToDelete(null);
     } catch (err) {
       console.error('Error deleting task:', err);
       setError('Failed to delete task');
     }
+  };
+
+  const openDeleteTaskModal = (task: Task) => {
+    setTaskToDelete(task);
+    setDeleteTaskModalOpen(true);
+  };
+
+  const closeDeleteTaskModal = () => {
+    setDeleteTaskModalOpen(false);
+    setTaskToDelete(null);
   };
 
   if (isLoading) {
@@ -100,6 +112,41 @@ const ProjectDetailsPage: React.FC = () => {
 
   return (
     <div className="container mx-auto p-4">
+      {/* Delete Task Confirmation Modal */}
+      {deleteTaskModalOpen && taskToDelete && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center">
+          <div className="relative p-5 border w-96 shadow-lg rounded-md bg-white dark:bg-gray-800">
+            <div className="mt-3 text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900">
+                <svg className="h-6 w-6 text-red-600 dark:text-red-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </div>
+              <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white mt-2">Delete Task</h3>
+              <div className="mt-2 px-7 py-3">
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Are you sure you want to delete the task "{taskToDelete.title}"? This action cannot be undone.
+                </p>
+              </div>
+              <div className="flex justify-center space-x-4 mt-4">
+                <button
+                  onClick={closeDeleteTaskModal}
+                  className="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleDeleteTask(taskToDelete.id!)}
+                  className="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Project Details Section */}
       <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6 mb-6">
         <div className="flex justify-between items-start mb-4">
@@ -238,7 +285,7 @@ const ProjectDetailsPage: React.FC = () => {
                             Edit
                           </button>
                           <button
-                            onClick={() => handleDeleteTask(task.id!)}
+                            onClick={() => openDeleteTaskModal(task)}
                             className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
                           >
                             Delete

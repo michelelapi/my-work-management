@@ -1,4 +1,5 @@
 import React from 'react';
+import CompanyStats from '../components/CompanyStats';
 
 const Dashboard: React.FC = () => {
   return (
@@ -10,10 +11,7 @@ const Dashboard: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-gray-100 dark:bg-gray-800 p-6 rounded-lg shadow-md">
-          <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">Account Summary</h3>
-          <p className="text-gray-700 dark:text-gray-400">View your account balances and activities.</p>
-        </div>
+        <CompanyStats />
         <div className="bg-gray-100 dark:bg-gray-800 p-6 rounded-lg shadow-md">
           <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">Recent Transactions</h3>
           <p className="text-gray-700 dark:text-gray-400">See your latest income and expenses.</p>

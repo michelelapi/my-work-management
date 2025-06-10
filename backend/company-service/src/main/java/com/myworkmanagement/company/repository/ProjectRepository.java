@@ -15,4 +15,5 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
     Optional<Project> findByCompanyIdAndId(Long companyId, Long id);
     boolean existsByCompanyIdAndName(Long companyId, String name);
     Page<Project> findAllByUserEmail(String userEmail, Pageable pageable);
+    Long countByCompanyId(Long companyId);
 } 

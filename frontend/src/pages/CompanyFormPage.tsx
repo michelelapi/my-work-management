@@ -21,6 +21,7 @@ const CompanyFormPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   const isEditMode = !!companyId;
 
@@ -134,17 +135,22 @@ const CompanyFormPage: React.FC = () => {
       return;
     }
 
+    setShowConfirmModal(true);
+  };
+
+  const handleConfirmSave = async () => {
     setSaveError(null);
     setIsSaving(true);
 
     try {
       const savedCompany = await companyService.saveCompany(company);
-      navigate(`/companies/${savedCompany.id}`); // Navigate to the details page after saving
+      navigate(`/companies/${savedCompany.id}`);
     } catch (err) {
       console.error('Error saving company:', err);
       setSaveError(`Failed to save company: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setIsSaving(false);
+      setShowConfirmModal(false);
     }
   };
 
@@ -158,6 +164,44 @@ const CompanyFormPage: React.FC = () => {
 
   return (
     <div className="container mx-auto p-4 dark:text-white">
+      {/* Confirmation Modal */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center">
+          <div className="relative p-5 border w-96 shadow-lg rounded-md bg-white dark:bg-gray-800">
+            <div className="mt-3 text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 dark:bg-green-900">
+                <svg className="h-6 w-6 text-green-600 dark:text-green-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white mt-2">
+                {isEditMode ? 'Update Company' : 'Create Company'}
+              </h3>
+              <div className="mt-2 px-7 py-3">
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Are you sure you want to {isEditMode ? 'update' : 'create'} this company?
+                </p>
+              </div>
+              <div className="flex justify-center space-x-4 mt-4">
+                <button
+                  onClick={() => setShowConfirmModal(false)}
+                  className="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmSave}
+                  disabled={isSaving}
+                  className="px-4 py-2 bg-green-600 text-white text-base font-medium rounded-md shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+                >
+                  {isSaving ? 'Saving...' : 'Confirm'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <h1 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">{isEditMode ? 'Edit Company' : 'Create Company'}</h1>
 
       {saveError && (
@@ -349,11 +393,18 @@ const CompanyFormPage: React.FC = () => {
         </div>
 
         {/* Submit Button */}
-        <div>
+        <div className="flex justify-end space-x-4">
+          <button
+            type="button"
+            onClick={() => navigate('/companies')}
+            className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            Cancel
+          </button>
           <button
             type="submit"
             disabled={isSaving}
-            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
           >
             {isSaving ? 'Saving...' : (isEditMode ? 'Update Company' : 'Create Company')}
           </button>

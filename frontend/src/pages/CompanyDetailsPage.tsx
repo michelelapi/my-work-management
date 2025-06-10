@@ -21,6 +21,10 @@ const CompanyDetailsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isProjectsExpanded, setIsProjectsExpanded] = useState(true);
   const [isContactsExpanded, setIsContactsExpanded] = useState(true);
+  const [deleteContactModalOpen, setDeleteContactModalOpen] = useState(false);
+  const [deleteProjectModalOpen, setDeleteProjectModalOpen] = useState(false);
+  const [contactToDelete, setContactToDelete] = useState<CompanyContact | null>(null);
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
 
   // Load sections state from localStorage
   useEffect(() => {
@@ -90,13 +94,13 @@ const CompanyDetailsPage: React.FC = () => {
   }, [companyId]);
 
   const handleDeleteContact = async (contactId: number) => {
-    if (!companyId || !window.confirm('Are you sure you want to delete this contact?')) {
-      return;
-    }
+    if (!companyId) return;
 
     try {
       await companyService.deleteCompanyContact(parseInt(companyId, 10), contactId);
       setContacts(contacts.filter(contact => contact.id !== contactId));
+      setDeleteContactModalOpen(false);
+      setContactToDelete(null);
     } catch (err) {
       console.error('Error deleting contact:', err);
       setError('Failed to delete contact');
@@ -104,17 +108,37 @@ const CompanyDetailsPage: React.FC = () => {
   };
 
   const handleDeleteProject = async (projectId: number) => {
-    if (!companyId || !window.confirm('Are you sure you want to delete this project?')) {
-      return;
-    }
+    if (!companyId) return;
 
     try {
       await projectService.deleteProject(parseInt(companyId, 10), projectId);
       setProjects(projects.filter(project => project.id !== projectId));
+      setDeleteProjectModalOpen(false);
+      setProjectToDelete(null);
     } catch (err) {
       console.error('Error deleting project:', err);
       setError('Failed to delete project');
     }
+  };
+
+  const openDeleteContactModal = (contact: CompanyContact) => {
+    setContactToDelete(contact);
+    setDeleteContactModalOpen(true);
+  };
+
+  const closeDeleteContactModal = () => {
+    setDeleteContactModalOpen(false);
+    setContactToDelete(null);
+  };
+
+  const openDeleteProjectModal = (project: Project) => {
+    setProjectToDelete(project);
+    setDeleteProjectModalOpen(true);
+  };
+
+  const closeDeleteProjectModal = () => {
+    setDeleteProjectModalOpen(false);
+    setProjectToDelete(null);
   };
 
   if (isLoading) {
@@ -127,6 +151,76 @@ const CompanyDetailsPage: React.FC = () => {
 
   return (
     <div className="container mx-auto p-4">
+      {/* Delete Contact Confirmation Modal */}
+      {deleteContactModalOpen && contactToDelete && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center">
+          <div className="relative p-5 border w-96 shadow-lg rounded-md bg-white dark:bg-gray-800">
+            <div className="mt-3 text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900">
+                <svg className="h-6 w-6 text-red-600 dark:text-red-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </div>
+              <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white mt-2">Delete Contact</h3>
+              <div className="mt-2 px-7 py-3">
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Are you sure you want to delete the contact "{contactToDelete.name}"? This action cannot be undone.
+                </p>
+              </div>
+              <div className="flex justify-center space-x-4 mt-4">
+                <button
+                  onClick={closeDeleteContactModal}
+                  className="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleDeleteContact(contactToDelete.id!)}
+                  className="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Project Confirmation Modal */}
+      {deleteProjectModalOpen && projectToDelete && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center">
+          <div className="relative p-5 border w-96 shadow-lg rounded-md bg-white dark:bg-gray-800">
+            <div className="mt-3 text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900">
+                <svg className="h-6 w-6 text-red-600 dark:text-red-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </div>
+              <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white mt-2">Delete Project</h3>
+              <div className="mt-2 px-7 py-3">
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Are you sure you want to delete the project "{projectToDelete.name}"? This action cannot be undone.
+                </p>
+              </div>
+              <div className="flex justify-center space-x-4 mt-4">
+                <button
+                  onClick={closeDeleteProjectModal}
+                  className="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleDeleteProject(projectToDelete.id!)}
+                  className="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Company Details Section */}
       <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6 mb-6">
         <div className="flex justify-between items-start mb-4">
@@ -249,7 +343,7 @@ const CompanyDetailsPage: React.FC = () => {
                             Edit
                           </button>
                           <button
-                            onClick={() => handleDeleteProject(project.id!)}
+                            onClick={() => openDeleteProjectModal(project)}
                             className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
                           >
                             Delete
@@ -345,7 +439,7 @@ const CompanyDetailsPage: React.FC = () => {
                             Edit
                           </button>
                           <button
-                            onClick={() => handleDeleteContact(contact.id!)}
+                            onClick={() => openDeleteContactModal(contact)}
                             className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
                           >
                             Delete

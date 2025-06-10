@@ -64,16 +64,16 @@ docker-compose -f .\docker-compose.dev.yml up -d
 ### Create database in the containers
 - Create db in Authentication container
 - run these commands
-    ### Copy the script into the container
+    #### Copy the script into the container
     docker cp ../backend/auth-service/src/main/resources/db/init.sql auth-service-db:/tmp/init.sql
 
-    ### Execute the script
+    #### Execute the script
     docker exec -it  auth-service-db psql -U postgres -d auth_service_db -f /tmp/init.sql
 
 - Create db in Application container
 - run these commands
-    ### Copy the script into the container
+    #### Copy the script into the container
     docker cp ../backend/company-service/src/main/resources/db/init.sql company-service-db:/tmp/init.sql
 
-    ### Execute the script
+    #### Execute the script
     docker exec -it company-service-db psql -U postgres -d company_service_db -f /tmp/init.sql

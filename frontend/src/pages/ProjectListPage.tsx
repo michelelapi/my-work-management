@@ -123,6 +123,12 @@ const ProjectListPage: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <Link
+                      to={`/companies/${project.companyId}/projects/${project.id}`}
+                      className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 mr-4"
+                    >
+                      View
+                    </Link>
+                    <Link
                       to={`/companies/${project.companyId}/projects/${project.id}/edit`}
                       className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-4"
                     >

@@ -49,7 +49,6 @@ public class TaskDTO {
     private String invoiceId;
     private String notes;
 
-    @NotBlank(message = "User email is required")
     private String userEmail;
 
     private LocalDateTime createdAt;

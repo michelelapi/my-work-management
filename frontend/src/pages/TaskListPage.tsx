@@ -64,14 +64,12 @@ const TaskListPage: React.FC = () => {
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
                     {projectId ? 'Project Tasks' : 'All Tasks'}
                 </h1>
-                {projectId && (
-                    <button
-                        onClick={() => navigate(`/projects/${projectId}/tasks/new`)}
-                        className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md transition-colors"
-                    >
-                        Add New Task
-                    </button>
-                )}
+                <button
+                    onClick={() => navigate(`/tasks/new`)}
+                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md transition-colors"
+                >
+                    Add New Task
+                </button>
             </div>
 
             {tasks.length === 0 ? (
@@ -128,7 +126,7 @@ const TaskListPage: React.FC = () => {
                                         <button
                                             onClick={() => {
                                                 if (task.projectId) {
-                                                    navigate(`/projects/${task.projectId}/tasks/${task.id}/edit`);
+                                                    navigate(`/companies/${task.projectId}/projects/${task.projectId}/tasks/${task.id}/edit`);
                                                 }
                                             }}
                                             className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-4"

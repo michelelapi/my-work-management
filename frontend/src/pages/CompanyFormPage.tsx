@@ -3,6 +3,15 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Company } from '../types/company';
 import companyService from '../services/companyService';
 
+interface ValidationErrors {
+  name?: string;
+  email?: string;
+  phone?: string;
+  website?: string;
+  taxId?: string;
+  paymentTerms?: string;
+}
+
 const CompanyFormPage: React.FC = () => {
   const { companyId } = useParams<{ companyId: string }>();
   const navigate = useNavigate();
@@ -11,6 +20,7 @@ const CompanyFormPage: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
 
   const isEditMode = !!companyId;
 
@@ -44,6 +54,71 @@ const CompanyFormPage: React.FC = () => {
     fetchCompany();
   }, [companyId, isEditMode]); // Refetch when companyId changes or mode changes
 
+  const validateField = (name: string, value: string | number | undefined): string | undefined => {
+    switch (name) {
+      case 'name':
+        if (!value) return 'Company name is required';
+        if (typeof value === 'string' && value.length < 2) return 'Company name must be at least 2 characters';
+        break;
+      case 'email':
+        if (!value) return 'Email is required';
+        if (typeof value === 'string') {
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!emailRegex.test(value)) return 'Please enter a valid email address';
+        }
+        break;
+      case 'phone':
+        if (value) {
+          const phoneRegex = /^\+?[\d\s-()]{8,}$/;
+          if (typeof value === 'string' && !phoneRegex.test(value)) {
+            return 'Please enter a valid phone number';
+          }
+        }
+        break;
+      case 'website':
+        if (value) {
+          const urlRegex = /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?$/;
+          if (typeof value === 'string' && !urlRegex.test(value)) {
+            return 'Please enter a valid website URL';
+          }
+        }
+        break;
+      case 'taxId':
+        if (value) {
+          if (typeof value === 'string' && value.length < 3) {
+            return 'Tax ID must be at least 3 characters';
+          }
+        }
+        break;
+      case 'paymentTerms':
+        if (value) {
+          const numValue = Number(value);
+          if (isNaN(numValue) || numValue < 0) {
+            return 'Payment terms must be a positive number';
+          }
+        }
+        break;
+    }
+    return undefined;
+  };
+
+  const validateForm = (): boolean => {
+    const errors: ValidationErrors = {};
+    let isValid = true;
+
+    // Validate all fields at once
+    Object.keys(company).forEach((field) => {
+      const error = validateField(field, company[field as keyof Company]);
+      if (error) {
+        errors[field as keyof ValidationErrors] = error;
+        isValid = false;
+      }
+    });
+
+    setValidationErrors(errors);
+    return isValid;
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setCompany(prev => ({
@@ -54,6 +129,11 @@ const CompanyFormPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!validateForm()) {
+      return;
+    }
+
     setSaveError(null);
     setIsSaving(true);
 
@@ -86,19 +166,25 @@ const CompanyFormPage: React.FC = () => {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md space-y-4">
+      <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md space-y-4" noValidate>
         {/* Company Name */}
         <div>
-          <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Company Name</label>
+          <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Company Name <span className="text-red-500">*</span>
+          </label>
           <input
             type="text"
             name="name"
             id="name"
-            required
             value={company.name}
             onChange={handleChange}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
+            className={`mt-1 block w-full rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm ${
+              validationErrors.name ? 'border-red-300' : 'border-gray-300'
+            } dark:border-gray-600 dark:bg-gray-700 dark:text-white`}
           />
+          {validationErrors.name && (
+            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{validationErrors.name}</p>
+          )}
         </div>
 
         {/* Description */}
@@ -129,28 +215,43 @@ const CompanyFormPage: React.FC = () => {
 
         {/* Email */}
         <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Email</label>
+          <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Email <span className="text-red-500">*</span>
+          </label>
           <input
-            type="email"
+            type="text"
             name="email"
             id="email"
             value={company.email || ''}
             onChange={handleChange}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
+            className={`mt-1 block w-full rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm ${
+              validationErrors.email ? 'border-red-300' : 'border-gray-300'
+            } dark:border-gray-600 dark:bg-gray-700 dark:text-white`}
           />
+          {validationErrors.email && (
+            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{validationErrors.email}</p>
+          )}
         </div>
 
          {/* Phone */}
          <div>
-          <label htmlFor="phone" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Phone</label>
+          <label htmlFor="phone" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Phone
+          </label>
           <input
             type="text"
             name="phone"
             id="phone"
             value={company.phone || ''}
             onChange={handleChange}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
+            placeholder="+1 (555) 555-5555"
+            className={`mt-1 block w-full rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm ${
+              validationErrors.phone ? 'border-red-300' : 'border-gray-300'
+            } dark:border-gray-600 dark:bg-gray-700 dark:text-white`}
           />
+          {validationErrors.phone && (
+            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{validationErrors.phone}</p>
+          )}
         </div>
 
         {/* Address */}
@@ -167,42 +268,65 @@ const CompanyFormPage: React.FC = () => {
         </div>
 
         {/* Website */}
-         <div>
-          <label htmlFor="website" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Website</label>
+        <div>
+          <label htmlFor="website" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Website
+          </label>
           <input
             type="text"
             name="website"
             id="website"
             value={company.website || ''}
             onChange={handleChange}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
+            placeholder="https://example.com"
+            className={`mt-1 block w-full rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm ${
+              validationErrors.website ? 'border-red-300' : 'border-gray-300'
+            } dark:border-gray-600 dark:bg-gray-700 dark:text-white`}
           />
+          {validationErrors.website && (
+            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{validationErrors.website}</p>
+          )}
         </div>
 
         {/* Tax ID */}
-         <div>
-          <label htmlFor="taxId" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Tax ID</label>
+        <div>
+          <label htmlFor="taxId" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Tax ID
+          </label>
           <input
             type="text"
             name="taxId"
             id="taxId"
             value={company.taxId || ''}
             onChange={handleChange}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
+            className={`mt-1 block w-full rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm ${
+              validationErrors.taxId ? 'border-red-300' : 'border-gray-300'
+            } dark:border-gray-600 dark:bg-gray-700 dark:text-white`}
           />
+          {validationErrors.taxId && (
+            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{validationErrors.taxId}</p>
+          )}
         </div>
 
          {/* Payment Terms */}
          <div>
-          <label htmlFor="paymentTerms" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Terms</label>
+          <label htmlFor="paymentTerms" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Payment Terms (days)
+          </label>
           <input
             type="number"
             name="paymentTerms"
             id="paymentTerms"
+            min="0"
             value={company.paymentTerms || ''}
             onChange={handleChange}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
+            className={`mt-1 block w-full rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm ${
+              validationErrors.paymentTerms ? 'border-red-300' : 'border-gray-300'
+            } dark:border-gray-600 dark:bg-gray-700 dark:text-white`}
           />
+          {validationErrors.paymentTerms && (
+            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{validationErrors.paymentTerms}</p>
+          )}
         </div>
 
          {/* Status - Assuming a dropdown or similar for CompanyStatus */}

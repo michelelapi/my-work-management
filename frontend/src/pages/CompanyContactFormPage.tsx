@@ -3,6 +3,13 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { CompanyContact } from '../types/companyContact';
 import companyService from '../services/companyService';
 
+interface ValidationErrors {
+  name?: string;
+  email?: string;
+  phone?: string;
+  role?: string;
+}
+
 const CompanyContactFormPage: React.FC = () => {
   const { companyId, contactId } = useParams<{ companyId: string; contactId: string }>();
   const navigate = useNavigate();
@@ -15,6 +22,7 @@ const CompanyContactFormPage: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
 
   const isEditMode = !!contactId;
 
@@ -45,6 +53,54 @@ const CompanyContactFormPage: React.FC = () => {
     fetchContact();
   }, [companyId, contactId, isEditMode]);
 
+  const validateField = (name: string, value: string | undefined): string | undefined => {
+    switch (name) {
+      case 'name':
+        if (!value) return 'Contact name is required';
+        if (value.length < 2) return 'Contact name must be at least 2 characters';
+        break;
+      case 'email':
+        if (!value) return 'Email is required';
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(value)) return 'Please enter a valid email address';
+        break;
+      case 'phone':
+        if (!value) return 'Phone number is required';
+        if (value) {
+          const phoneRegex = /^\+?[\d\s-()]{8,}$/;
+          if (!phoneRegex.test(value)) {
+            return 'Please enter a valid phone number';
+          }
+        }
+        break;
+      case 'role':
+        // No specific validation rule needed as it's optional.
+        break;
+    }
+    return undefined;
+  };
+
+  const validateForm = (): boolean => {
+    const errors: ValidationErrors = {};
+    let isValid = true;
+
+    // Validate only fields that are explicitly in ValidationErrors and are strings
+    const fieldsToValidate: Array<keyof ValidationErrors> = ['name', 'email', 'phone', 'role'];
+
+    fieldsToValidate.forEach((field) => {
+      // Ensure we only pass string or undefined to validateField
+      const value = typeof contact[field] === 'string' ? contact[field] : undefined;
+      const error = validateField(field, value);
+      if (error) {
+        errors[field] = error;
+        isValid = false;
+      }
+    });
+
+    setValidationErrors(errors);
+    return isValid;
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target as HTMLInputElement;
     setContact(prev => ({
@@ -56,6 +112,10 @@ const CompanyContactFormPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!companyId) return;
+
+    if (!validateForm()) {
+      return;
+    }
 
     setSaveError(null);
     setIsSaving(true);
@@ -91,53 +151,66 @@ const CompanyContactFormPage: React.FC = () => {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md space-y-4">
+      <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md space-y-4" noValidate>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Name */}
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Name
+              Name <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               name="name"
               id="name"
-              required
               value={contact.name}
               onChange={handleChange}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
+              className={`mt-1 block w-full rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm ${
+                validationErrors.name ? 'border-red-300' : 'border-gray-300'
+              } dark:border-gray-600 dark:bg-gray-700 dark:text-white`}
             />
+            {validationErrors.name && (
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{validationErrors.name}</p>
+            )}
           </div>
 
           {/* Email */}
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Email
+              Email <span className="text-red-500">*</span>
             </label>
             <input
-              type="email"
+              type="text"
               name="email"
               id="email"
-              required
               value={contact.email}
               onChange={handleChange}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
+              className={`mt-1 block w-full rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm ${
+                validationErrors.email ? 'border-red-300' : 'border-gray-300'
+              } dark:border-gray-600 dark:bg-gray-700 dark:text-white`}
             />
+            {validationErrors.email && (
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{validationErrors.email}</p>
+            )}
           </div>
 
           {/* Phone */}
           <div>
             <label htmlFor="phone" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Phone
+              Phone <span className="text-red-500">*</span>
             </label>
             <input
-              type="tel"
+              type="text"
               name="phone"
               id="phone"
               value={contact.phone || ''}
               onChange={handleChange}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
+              className={`mt-1 block w-full rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm ${
+                validationErrors.phone ? 'border-red-300' : 'border-gray-300'
+              } dark:border-gray-600 dark:bg-gray-700 dark:text-white`}
             />
+            {validationErrors.phone && (
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{validationErrors.phone}</p>
+            )}
           </div>
 
           {/* Role */}
@@ -151,8 +224,13 @@ const CompanyContactFormPage: React.FC = () => {
               id="role"
               value={contact.role || ''}
               onChange={handleChange}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
+              className={`mt-1 block w-full rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm ${
+                validationErrors.role ? 'border-red-300' : 'border-gray-300'
+              } dark:border-gray-600 dark:bg-gray-700 dark:text-white`}
             />
+            {validationErrors.role && (
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{validationErrors.role}</p>
+            )}
           </div>
         </div>
 

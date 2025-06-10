@@ -8,9 +8,6 @@ CREATE TABLE users (
     role VARCHAR(20) NOT NULL
 );
 
--- Create an admin user with password 'admin123'
-INSERT INTO users (email, password, first_name, last_name, role)
-VALUES ('admin@myworkmanagement.com', '$2a$10$rDkPvvAFV8c3l0FqF1YwUOQZqZqZqZqZqZqZqZqZqZqZqZqZqZq', 'Admin', 'User', 'ADMIN');
 
 -- Create indexes
 CREATE INDEX idx_users_email ON users(email);

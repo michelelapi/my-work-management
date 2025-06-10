@@ -11,7 +11,6 @@ services:
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=company_service_db
     volumes:
-      - ../backend/company-service/src/main/resources/db/init.sql:/docker-entrypoint-initdb.d/init.sql
       - company-db-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]

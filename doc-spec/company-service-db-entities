@@ -149,7 +149,7 @@ CREATE TABLE tasks (
     end_date DATE,
     hours_worked DECIMAL(5,2) NOT NULL,
     rate_used DECIMAL(10,2),
-    rate_type rate_type,
+    rate_type VARCHAR(6) DEFAULT 'HOURLY',
     currency VARCHAR(3) DEFAULT 'EUR',
     is_billed BOOLEAN DEFAULT FALSE,
     is_paid BOOLEAN DEFAULT FALSE,

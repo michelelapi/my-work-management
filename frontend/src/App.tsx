@@ -12,7 +12,9 @@ import CompanyFormPage from './pages/CompanyFormPage';
 import CompanyContactFormPage from './pages/CompanyContactFormPage';
 import ProjectListPage from './pages/ProjectListPage';
 import ProjectFormPage from './pages/ProjectFormPage';
+import TaskListPage from './pages/TaskListPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
+import TaskFormPage from './pages/TaskFormPage';
 
 function App() {
   return (
@@ -37,9 +39,17 @@ function App() {
 
                 {/* Project Routes */}
                 <Route path="/projects" element={<ProtectedRoute><ProjectListPage /></ProtectedRoute>} />
+                <Route path="/projects/new" element={<ProtectedRoute><ProjectFormPage /></ProtectedRoute>} />
                 <Route path="/companies/:companyId/projects" element={<ProtectedRoute><ProjectListPage /></ProtectedRoute>} />
                 <Route path="/companies/:companyId/projects/new" element={<ProtectedRoute><ProjectFormPage /></ProtectedRoute>} />
                 <Route path="/companies/:companyId/projects/:projectId/edit" element={<ProtectedRoute><ProjectFormPage /></ProtectedRoute>} />
+
+                {/* Task Routes */}
+                <Route path="/tasks" element={<ProtectedRoute><TaskListPage /></ProtectedRoute>} />
+                <Route path="/tasks/new" element={<ProtectedRoute><TaskFormPage /></ProtectedRoute>} />
+                <Route path="/projects/:projectId/tasks" element={<ProtectedRoute><TaskListPage /></ProtectedRoute>} />
+                <Route path="/projects/:projectId/tasks/new" element={<ProtectedRoute><TaskFormPage /></ProtectedRoute>} />
+                <Route path="/projects/:projectId/tasks/:taskId/edit" element={<ProtectedRoute><TaskFormPage /></ProtectedRoute>} />
 
                 <Route path="*" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               </Routes>

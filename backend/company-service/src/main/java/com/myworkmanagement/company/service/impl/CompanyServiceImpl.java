@@ -93,6 +93,14 @@ public class CompanyServiceImpl implements CompanyService {
         return companyRepository.existsByTaxId(taxId);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public CompanyDTO getCompanyByName(String name) {
+        return companyRepository.findByName(name)
+                .map(this::mapToDTO)
+                .orElseThrow(() -> new ResourceNotFoundException("Company not found with name: " + name));
+    }
+
     private void validateCompanyUniqueness(CompanyDTO companyDTO) {
         if (companyDTO.getName() != null && existsByName(companyDTO.getName())) {
             throw new IllegalArgumentException("Company with name " + companyDTO.getName() + " already exists");

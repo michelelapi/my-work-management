@@ -12,4 +12,5 @@ public interface ProjectService {
     ProjectDTO updateProject(Long companyId, Long projectId, ProjectDTO projectDTO);
     void deleteProject(Long companyId, Long projectId);
     Page<ProjectDTO> searchProjects(Long companyId, String searchTerm, Pageable pageable);
+    ProjectDTO getProjectByName(Long companyId, String projectName);
 } 

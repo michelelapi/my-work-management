@@ -4,6 +4,8 @@ import com.myworkmanagement.company.dto.TaskDTO;
 import com.myworkmanagement.company.service.TaskService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -43,12 +45,13 @@ public class TaskController {
     })
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
     public ResponseEntity<TaskDTO> createTask(
-            @Parameter(description = "Project ID", required = true) @PathVariable Long projectId,
-            @Parameter(description = "Task data", required = true) @Valid @RequestBody TaskDTO taskDTO) {
+            @Parameter(description = "Unique identifier of the project", required = true, example = "1") @PathVariable Long projectId,
+            @Parameter(description = "Task data", required = true, schema = @Schema(implementation = TaskDTO.class))
+            @Valid @RequestBody TaskDTO taskDTO) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String userEmail = authentication.getName();
         taskDTO.setUserEmail(userEmail);
-        return new ResponseEntity<>(taskService.createTask(taskDTO), HttpStatus.CREATED);
+        return new ResponseEntity<>(taskService.createTask(projectId, taskDTO), HttpStatus.CREATED);
     }
 
     @PutMapping("/projects/{projectId}/tasks/{id}")
@@ -62,9 +65,10 @@ public class TaskController {
     })
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
     public ResponseEntity<TaskDTO> updateTask(
-            @Parameter(description = "Project ID", required = true) @PathVariable Long projectId,
-            @Parameter(description = "Task ID", required = true) @PathVariable Long id,
-            @Parameter(description = "Updated task data", required = true) @Valid @RequestBody TaskDTO taskDTO) {
+            @Parameter(description = "Unique identifier of the project", required = true, example = "1") @PathVariable Long projectId,
+            @Parameter(description = "Unique identifier of the task", required = true, example = "1") @PathVariable Long id,
+            @Parameter(description = "Updated task data", required = true, schema = @Schema(implementation = TaskDTO.class))
+            @Valid @RequestBody TaskDTO taskDTO) {
         return ResponseEntity.ok(taskService.updateTask(id, taskDTO));
     }
 
@@ -78,7 +82,7 @@ public class TaskController {
     })
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
     public ResponseEntity<TaskDTO> getTask(
-            @Parameter(description = "Task ID", required = true) @PathVariable Long id) {
+            @Parameter(description = "Unique identifier of the task", required = true, example = "1") @PathVariable Long id) {
         return ResponseEntity.ok(taskService.getTask(id));
     }
 
@@ -90,7 +94,8 @@ public class TaskController {
         @ApiResponse(responseCode = "500", description = "Internal server error")
     })
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
-    public ResponseEntity<Page<TaskDTO>> getAllTasks(Pageable pageable) {
+    public ResponseEntity<Page<TaskDTO>> getAllTasks(
+            @Parameter(description = "Pagination parameters (page, size, sort)", required = false) Pageable pageable) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String userEmail = authentication.getName();
         return ResponseEntity.ok(taskService.getTasksByUserEmail(userEmail, pageable));
@@ -106,8 +111,8 @@ public class TaskController {
     })
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
     public ResponseEntity<Page<TaskDTO>> getTasksByProject(
-            @Parameter(description = "Project ID", required = true) @PathVariable Long projectId,
-            Pageable pageable) {
+            @Parameter(description = "Unique identifier of the project", required = true, example = "1") @PathVariable Long projectId,
+            @Parameter(description = "Pagination parameters (page, size, sort)", required = false) Pageable pageable) {
         return ResponseEntity.ok(taskService.getTasksByProject(projectId, pageable));
     }
 
@@ -121,10 +126,10 @@ public class TaskController {
     })
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
     public ResponseEntity<Page<TaskDTO>> getTasksByProjectAndDateRange(
-            @Parameter(description = "Project ID", required = true) @PathVariable Long projectId,
-            @Parameter(description = "Start date", required = true) @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @Parameter(description = "End date", required = true) @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
-            Pageable pageable) {
+            @Parameter(description = "Unique identifier of the project", required = true, example = "1") @PathVariable Long projectId,
+            @Parameter(description = "Start date of the range (YYYY-MM-DD)", required = true, example = "2024-03-01") @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @Parameter(description = "End date of the range (YYYY-MM-DD)", required = true, example = "2024-03-31") @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @Parameter(description = "Pagination parameters (page, size, sort)", required = false) Pageable pageable) {
         return ResponseEntity.ok(taskService.getTasksByProjectAndDateRange(projectId, startDate, endDate, pageable));
     }
 
@@ -136,7 +141,8 @@ public class TaskController {
         @ApiResponse(responseCode = "500", description = "Internal server error")
     })
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
-    public ResponseEntity<Page<TaskDTO>> getUnbilledTasks(Pageable pageable) {
+    public ResponseEntity<Page<TaskDTO>> getUnbilledTasks(
+            @Parameter(description = "Pagination parameters (page, size, sort)", required = false) Pageable pageable) {
         return ResponseEntity.ok(taskService.getUnbilledTasks(pageable));
     }
 
@@ -148,7 +154,8 @@ public class TaskController {
         @ApiResponse(responseCode = "500", description = "Internal server error")
     })
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
-    public ResponseEntity<Page<TaskDTO>> getUnpaidTasks(Pageable pageable) {
+    public ResponseEntity<Page<TaskDTO>> getUnpaidTasks(
+            @Parameter(description = "Pagination parameters (page, size, sort)", required = false) Pageable pageable) {
         return ResponseEntity.ok(taskService.getUnpaidTasks(pageable));
     }
 
@@ -162,8 +169,8 @@ public class TaskController {
     })
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
     public ResponseEntity<Page<TaskDTO>> getUnbilledTasksByProject(
-            @Parameter(description = "Project ID", required = true) @PathVariable Long projectId,
-            Pageable pageable) {
+            @Parameter(description = "Unique identifier of the project", required = true, example = "1") @PathVariable Long projectId,
+            @Parameter(description = "Pagination parameters (page, size, sort)", required = false) Pageable pageable) {
         return ResponseEntity.ok(taskService.getUnbilledTasksByProject(projectId, pageable));
     }
 
@@ -177,8 +184,8 @@ public class TaskController {
     })
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
     public ResponseEntity<Page<TaskDTO>> getUnpaidTasksByProject(
-            @Parameter(description = "Project ID", required = true) @PathVariable Long projectId,
-            Pageable pageable) {
+            @Parameter(description = "Unique identifier of the project", required = true, example = "1") @PathVariable Long projectId,
+            @Parameter(description = "Pagination parameters (page, size, sort)", required = false) Pageable pageable) {
         return ResponseEntity.ok(taskService.getUnpaidTasksByProject(projectId, pageable));
     }
 
@@ -192,8 +199,8 @@ public class TaskController {
     })
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteTask(
-            @Parameter(description = "Project ID", required = true) @PathVariable Long projectId,
-            @Parameter(description = "Task ID", required = true) @PathVariable Long id) {
+            @Parameter(description = "Unique identifier of the project", required = true, example = "1") @PathVariable Long projectId,
+            @Parameter(description = "Unique identifier of the task", required = true, example = "1") @PathVariable Long id) {
         taskService.deleteTask(id);
         return ResponseEntity.noContent().build();
     }
@@ -207,7 +214,8 @@ public class TaskController {
         @ApiResponse(responseCode = "500", description = "Internal server error")
     })
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
-    public ResponseEntity<Page<TaskDTO>> getTasksByUserEmail(Pageable pageable) {
+    public ResponseEntity<Page<TaskDTO>> getTasksByUserEmail(
+            @Parameter(description = "Pagination parameters (page, size, sort)", required = false) Pageable pageable) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String userEmail = authentication.getName();
         return ResponseEntity.ok(taskService.getTasksByUserEmail(userEmail, pageable));
@@ -223,8 +231,8 @@ public class TaskController {
     })
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
     public ResponseEntity<Page<TaskDTO>> getTasksByUserEmailAndProject(
-            @Parameter(description = "Project ID", required = true) @PathVariable Long projectId,
-            Pageable pageable) {
+            @Parameter(description = "Unique identifier of the project", required = true, example = "1") @PathVariable Long projectId,
+            @Parameter(description = "Pagination parameters (page, size, sort)", required = false) Pageable pageable) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String userEmail = authentication.getName();
         return ResponseEntity.ok(taskService.getTasksByUserEmailAndProject(userEmail, projectId, pageable));
@@ -238,7 +246,8 @@ public class TaskController {
         @ApiResponse(responseCode = "500", description = "Internal server error")
     })
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
-    public ResponseEntity<Page<TaskDTO>> getUnbilledTasksByUserEmail(Pageable pageable) {
+    public ResponseEntity<Page<TaskDTO>> getUnbilledTasksByUserEmail(
+            @Parameter(description = "Pagination parameters (page, size, sort)", required = false) Pageable pageable) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String userEmail = authentication.getName();
         return ResponseEntity.ok(taskService.getUnbilledTasksByUserEmail(userEmail, pageable));
@@ -252,7 +261,8 @@ public class TaskController {
         @ApiResponse(responseCode = "500", description = "Internal server error")
     })
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
-    public ResponseEntity<Page<TaskDTO>> getUnpaidTasksByUserEmail(Pageable pageable) {
+    public ResponseEntity<Page<TaskDTO>> getUnpaidTasksByUserEmail(
+            @Parameter(description = "Pagination parameters (page, size, sort)", required = false) Pageable pageable) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String userEmail = authentication.getName();
         return ResponseEntity.ok(taskService.getUnpaidTasksByUserEmail(userEmail, pageable));
@@ -268,8 +278,8 @@ public class TaskController {
     })
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
     public ResponseEntity<Page<TaskDTO>> getUnbilledTasksByUserEmailAndProject(
-            @Parameter(description = "Project ID", required = true) @PathVariable Long projectId,
-            Pageable pageable) {
+            @Parameter(description = "Unique identifier of the project", required = true, example = "1") @PathVariable Long projectId,
+            @Parameter(description = "Pagination parameters (page, size, sort)", required = false) Pageable pageable) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String userEmail = authentication.getName();
         return ResponseEntity.ok(taskService.getUnbilledTasksByUserEmailAndProject(userEmail, projectId, pageable));
@@ -285,8 +295,8 @@ public class TaskController {
     })
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
     public ResponseEntity<Page<TaskDTO>> getUnpaidTasksByUserEmailAndProject(
-            @Parameter(description = "Project ID", required = true) @PathVariable Long projectId,
-            Pageable pageable) {
+            @Parameter(description = "Unique identifier of the project", required = true, example = "1") @PathVariable Long projectId,
+            @Parameter(description = "Pagination parameters (page, size, sort)", required = false) Pageable pageable) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String userEmail = authentication.getName();
         return ResponseEntity.ok(taskService.getUnpaidTasksByUserEmailAndProject(userEmail, projectId, pageable));

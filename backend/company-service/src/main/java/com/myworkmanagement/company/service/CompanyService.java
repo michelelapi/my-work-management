@@ -24,4 +24,6 @@ public interface CompanyService {
     boolean existsByEmail(String email);
     
     boolean existsByTaxId(String taxId);
+    
+    CompanyDTO getCompanyByName(String name);
 } 

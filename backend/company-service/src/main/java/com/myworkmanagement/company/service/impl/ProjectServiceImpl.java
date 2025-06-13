@@ -88,13 +88,15 @@ public class ProjectServiceImpl implements ProjectService {
     @Override
     @Transactional(readOnly = true)
     public Page<ProjectDTO> searchProjects(Long companyId, String searchTerm, Pageable pageable) {
-        // This method assumes a search method in ProjectRepository. You might need to implement this.
-        // For now, it will return all projects for the company.
-        if (!companyRepository.existsById(companyId)) {
-            throw new ResourceNotFoundException("Company not found with id: " + companyId);
-        }
-        return projectRepository.findByCompanyId(companyId, pageable)
+        return projectRepository.findByCompanyIdAndNameContainingOrDescriptionContaining(companyId, searchTerm, searchTerm, pageable)
                 .map(this::mapToDTO);
+    }
+
+    @Override
+    public ProjectDTO getProjectByName(Long companyId, String projectName) {
+        Project project = projectRepository.findByCompanyIdAndName(companyId, projectName)
+                .orElseThrow(() -> new ResourceNotFoundException("Project not found with name: " + projectName + " for company: " + companyId));
+        return mapToDTO(project);
     }
 
     private ProjectDTO mapToDTO(Project project) {

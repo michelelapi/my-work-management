@@ -8,7 +8,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 public interface TaskService {
-    TaskDTO createTask(TaskDTO taskDTO);
+    TaskDTO createTask(Long projectId, TaskDTO taskDTO);
     TaskDTO updateTask(Long id, TaskDTO taskDTO);
     TaskDTO getTask(Long id);
     List<TaskDTO> getAllTasks();

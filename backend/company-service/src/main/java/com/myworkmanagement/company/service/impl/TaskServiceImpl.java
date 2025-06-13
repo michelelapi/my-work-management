@@ -26,9 +26,9 @@ public class TaskServiceImpl implements TaskService {
 
     @Override
     @Transactional
-    public TaskDTO createTask(TaskDTO taskDTO) {
-        Project project = projectRepository.findById(taskDTO.getProjectId())
-                .orElseThrow(() -> new ResourceNotFoundException("Project not found with id: " + taskDTO.getProjectId()));
+    public TaskDTO createTask(Long projectId, TaskDTO taskDTO) {
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new ResourceNotFoundException("Project not found with id: " + projectId));
 
         Task task = Task.builder()
                 .project(project)

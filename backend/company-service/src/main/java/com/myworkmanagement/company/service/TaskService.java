@@ -1,5 +1,7 @@
 package com.myworkmanagement.company.service;
 
+import com.myworkmanagement.company.dto.TaskBillingStatusUpdateDTO;
+import com.myworkmanagement.company.dto.TaskPaymentStatusUpdateDTO;
 import com.myworkmanagement.company.dto.TaskDTO;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -41,4 +43,20 @@ public interface TaskService {
     Page<TaskDTO> getUnpaidTasksByUserEmail(String userEmail, Pageable pageable);
     Page<TaskDTO> getUnbilledTasksByUserEmailAndProject(String userEmail, Long projectId, Pageable pageable);
     Page<TaskDTO> getUnpaidTasksByUserEmailAndProject(String userEmail, Long projectId, Pageable pageable);
+
+    /**
+     * Updates the billing status for multiple tasks
+     * @param taskUpdates List of task updates containing task IDs and their new billing status
+     * @return List of updated task DTOs
+     * @throws TaskBillingStatusException if any task is not found or update fails
+     */
+    List<TaskDTO> updateTasksBillingStatus(List<TaskBillingStatusUpdateDTO> taskUpdates);
+
+    /**
+     * Updates the payment status for multiple tasks
+     * @param taskUpdates List of task updates containing task IDs and their new payment status
+     * @return List of updated task DTOs
+     * @throws TaskPaymentStatusException if any task is not found or update fails
+     */
+    List<TaskDTO> updateTasksPaymentStatus(List<TaskPaymentStatusUpdateDTO> taskUpdates);
 } 

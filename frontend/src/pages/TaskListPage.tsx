@@ -5,6 +5,7 @@ import { taskService, PageResponse } from '../services/taskService';
 // import { FaPen, FaTrash } from 'react-icons/fa';
 import { FaPen } from "@react-icons/all-files/fa/FaPen"
 import { FaTrash } from "@react-icons/all-files/fa/FaTrash"
+import { FaCheck } from "@react-icons/all-files/fa/FaCheck"
 
 const TaskListPage: React.FC = () => {
     const { projectId } = useParams<{ projectId: string }>();
@@ -24,6 +25,27 @@ const TaskListPage: React.FC = () => {
 
     // Filter states
     const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+
+    // Billing status states
+    const [billingStatusModalOpen, setBillingStatusModalOpen] = useState(false);
+    const [selectedBillingStatus, setSelectedBillingStatus] = useState<boolean | null>(null);
+    const [billingDate, setBillingDate] = useState<string>(new Date().toISOString().split('T')[0]);
+    const [invoiceId, setInvoiceId] = useState<string>('');
+
+    // Payment status states
+    const [paymentStatusModalOpen, setPaymentStatusModalOpen] = useState(false);
+    const [selectedPaymentStatus, setSelectedPaymentStatus] = useState<boolean | null>(null);
+    const [paymentDate, setPaymentDate] = useState<string>(new Date().toISOString().split('T')[0]);
+
+    // Debounce search term
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearchTerm(searchTerm);
+        }, 500); // 500ms delay
+
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
 
     useEffect(() => {
         const fetchTasks = async () => { 
@@ -33,7 +55,7 @@ const TaskListPage: React.FC = () => {
                     projectId ? parseInt(projectId) : undefined,
                     currentPage,
                     pageSize,
-                    searchTerm // Pass searchTerm to the service
+                    debouncedSearchTerm // Use debounced search term
                 );
                 setTasks(response.content);
                 setTotalPages(response.totalPages);
@@ -49,10 +71,9 @@ const TaskListPage: React.FC = () => {
 
         fetchTasks();
 
-    }, [projectId, currentPage, pageSize, searchTerm]); // Add searchTerm to dependencies
+    }, [projectId, currentPage, pageSize, debouncedSearchTerm]); // Use debounced search term in dependencies
 
     useEffect(() => {
-
         if (searchTermRef.current && !loading) {
             searchTermRef.current.focus();
         }
@@ -67,7 +88,7 @@ const TaskListPage: React.FC = () => {
                     projectId ? parseInt(projectId) : undefined,
                     currentPage,
                     pageSize,
-                    searchTerm
+                    debouncedSearchTerm
                 );
                 setTasks(response.content);
                 setTotalPages(response.totalPages);
@@ -105,6 +126,72 @@ const TaskListPage: React.FC = () => {
     const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(event.target.value);
         setCurrentPage(0); // Reset to first page when search term changes        
+    };
+
+    const handleBillingStatusUpdate = async () => {
+        if (selectedBillingStatus === null) return;
+
+        try {
+            const taskUpdates = tasks.map(task => ({
+                taskId: task.id!,
+                isBilled: selectedBillingStatus,
+                billingDate: billingDate,
+                invoiceId: invoiceId
+            }));
+
+            await taskService.updateTasksBillingStatus(taskUpdates);
+            
+            // Refresh the task list
+            const response = await taskService.getTasks(
+                projectId ? parseInt(projectId) : undefined,
+                currentPage,
+                pageSize,
+                debouncedSearchTerm
+            );
+            setTasks(response.content);
+            setTotalPages(response.totalPages);
+            setTotalElements(response.totalElements);
+            
+            setBillingStatusModalOpen(false);
+            setSelectedBillingStatus(null);
+            setBillingDate(new Date().toISOString().split('T')[0]);
+            setInvoiceId('');
+        } catch (err) {
+            setError('Failed to update billing status. Please try again later.');
+            console.error('Error updating billing status:', err);
+        }
+    };
+
+    const handlePaymentStatusUpdate = async () => {
+        if (selectedPaymentStatus === null) return;
+
+        try {
+            const taskUpdates = tasks.map(task => ({
+                taskId: task.id!,
+                isPaid: selectedPaymentStatus,
+                paymentDate: paymentDate
+            }));
+
+            await taskService.updateTasksPaymentStatus(taskUpdates);
+            
+            // Refresh the task list
+            const response = await taskService.getTasks(
+                projectId ? parseInt(projectId) : undefined,
+                currentPage,
+                pageSize,
+                debouncedSearchTerm
+            );
+            setTasks(response.content);
+            setTotalPages(response.totalPages);
+            setTotalElements(response.totalElements);
+            
+            setPaymentStatusModalOpen(false);
+            setSelectedPaymentStatus(null);
+            setPaymentDate(new Date().toISOString().split('T')[0]);
+        } catch (err) {
+            setError('Failed to update payment status. Please try again later.');
+            console.error('Error updating payment status:', err);
+        }
     };
 
     if (loading) {
@@ -164,13 +251,195 @@ const TaskListPage: React.FC = () => {
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
                     {projectId ? 'Project Tasks' : 'All Tasks'}
                 </h1>
-                <button
-                    onClick={() => navigate('/tasks/new')}
-                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md transition-colors"
-                >
-                    Add New Task
-                </button>
+                <div className="flex space-x-4">
+                    <button
+                        onClick={() => setBillingStatusModalOpen(true)}
+                        className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md transition-colors flex items-center"
+                    >
+                        <FaCheck className="mr-2" />
+                        Update Status Billed
+                    </button>
+                    <button
+                        onClick={() => setPaymentStatusModalOpen(true)}
+                        className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md transition-colors flex items-center"
+                    >
+                        <FaCheck className="mr-2" />
+                        Update Status Payment
+                    </button>
+                    <button
+                        onClick={() => navigate('/tasks/new')}
+                        className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md transition-colors"
+                    >
+                        Add New Task
+                    </button>
+                </div>
             </div>
+
+            {/* Billing Status Update Modal */}
+            {billingStatusModalOpen && (
+                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center">
+                    <div className="relative p-5 border w-96 shadow-lg rounded-md bg-white dark:bg-gray-800">
+                        <div className="mt-3 text-center">
+                            <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 dark:bg-green-900">
+                                <FaCheck className="h-6 w-6 text-green-600 dark:text-green-200" />
+                            </div>
+                            <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white mt-2">
+                                Update Billing Status
+                            </h3>
+                            <div className="mt-2 px-7 py-3">
+                                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                                    This will update the billing status for all {tasks.length} filtered tasks.
+                                </p>
+                                <div className="flex flex-col space-y-4">
+                                    <div className="flex justify-center space-x-4">
+                                        <button
+                                            onClick={() => setSelectedBillingStatus(true)}
+                                            className={`px-4 py-2 rounded-md ${
+                                                selectedBillingStatus === true
+                                                    ? 'bg-green-500 text-white'
+                                                    : 'bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+                                            }`}
+                                        >
+                                            Mark as Billed
+                                        </button>
+                                        <button
+                                            onClick={() => setSelectedBillingStatus(false)}
+                                            className={`px-4 py-2 rounded-md ${
+                                                selectedBillingStatus === false
+                                                    ? 'bg-yellow-500 text-white'
+                                                    : 'bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+                                            }`}
+                                        >
+                                            Mark as Unbilled
+                                        </button>
+                                    </div>
+                                    <div className="flex flex-col items-center space-y-2">
+                                        <label htmlFor="billingDate" className="text-sm text-gray-600 dark:text-gray-400">
+                                            Billing Date
+                                        </label>
+                                        <input
+                                            type="date"
+                                            id="billingDate"
+                                            value={billingDate}
+                                            onChange={(e) => setBillingDate(e.target.value)}
+                                            className="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                        />
+                                    </div>
+                                    <div className="flex flex-col items-center space-y-2">
+                                        <label htmlFor="invoiceId" className="text-sm text-gray-600 dark:text-gray-400">
+                                            Invoice ID
+                                        </label>
+                                        <input
+                                            type="text"
+                                            id="invoiceId"
+                                            value={invoiceId}
+                                            onChange={(e) => setInvoiceId(e.target.value)}
+                                            placeholder="Enter invoice ID"
+                                            className="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white w-full"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex justify-center space-x-4 mt-4">
+                                <button
+                                    onClick={() => {
+                                        setBillingStatusModalOpen(false);
+                                        setSelectedBillingStatus(null);
+                                        setBillingDate(new Date().toISOString().split('T')[0]);
+                                        setInvoiceId('');
+                                    }}
+                                    className="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleBillingStatusUpdate}
+                                    disabled={selectedBillingStatus === null}
+                                    className="px-4 py-2 bg-green-600 text-white text-base font-medium rounded-md shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+                                >
+                                    Update
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Payment Status Update Modal */}
+            {paymentStatusModalOpen && (
+                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center">
+                    <div className="relative p-5 border w-96 shadow-lg rounded-md bg-white dark:bg-gray-800">
+                        <div className="mt-3 text-center">
+                            <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-900">
+                                <FaCheck className="h-6 w-6 text-blue-600 dark:text-blue-200" />
+                            </div>
+                            <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white mt-2">
+                                Update Payment Status
+                            </h3>
+                            <div className="mt-2 px-7 py-3">
+                                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                                    This will update the payment status for all {tasks.length} filtered tasks.
+                                </p>
+                                <div className="flex flex-col space-y-4">
+                                    <div className="flex justify-center space-x-4">
+                                        <button
+                                            onClick={() => setSelectedPaymentStatus(true)}
+                                            className={`px-4 py-2 rounded-md ${
+                                                selectedPaymentStatus === true
+                                                    ? 'bg-green-500 text-white'
+                                                    : 'bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+                                            }`}
+                                        >
+                                            Mark as Paid
+                                        </button>
+                                        <button
+                                            onClick={() => setSelectedPaymentStatus(false)}
+                                            className={`px-4 py-2 rounded-md ${
+                                                selectedPaymentStatus === false
+                                                    ? 'bg-yellow-500 text-white'
+                                                    : 'bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+                                            }`}
+                                        >
+                                            Mark as Unpaid
+                                        </button>
+                                    </div>
+                                    <div className="flex flex-col items-center space-y-2">
+                                        <label htmlFor="paymentDate" className="text-sm text-gray-600 dark:text-gray-400">
+                                            Payment Date
+                                        </label>
+                                        <input
+                                            type="date"
+                                            id="paymentDate"
+                                            value={paymentDate}
+                                            onChange={(e) => setPaymentDate(e.target.value)}
+                                            className="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex justify-center space-x-4 mt-4">
+                                <button
+                                    onClick={() => {
+                                        setPaymentStatusModalOpen(false);
+                                        setSelectedPaymentStatus(null);
+                                        setPaymentDate(new Date().toISOString().split('T')[0]);
+                                    }}
+                                    className="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handlePaymentStatusUpdate}
+                                    disabled={selectedPaymentStatus === null}
+                                    className="px-4 py-2 bg-blue-600 text-white text-base font-medium rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                                >
+                                    Update
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Filter and Page Size Controls */}
             <div className="flex flex-col md:flex-row justify-between items-center mb-4 space-y-4 md:space-y-0 md:space-x-4">

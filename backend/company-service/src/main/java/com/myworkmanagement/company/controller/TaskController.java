@@ -1,6 +1,8 @@
 package com.myworkmanagement.company.controller;
 
 import com.myworkmanagement.company.dto.TaskDTO;
+import com.myworkmanagement.company.dto.TaskBillingStatusUpdateDTO;
+import com.myworkmanagement.company.dto.TaskPaymentStatusUpdateDTO;
 import com.myworkmanagement.company.service.TaskService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -24,6 +26,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api")
@@ -304,5 +307,37 @@ public class TaskController {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String userEmail = authentication.getName();
         return ResponseEntity.ok(taskService.getUnpaidTasksByUserEmailAndProject(userEmail, projectId, pageable));
+    }
+
+    @PutMapping("/tasks/billing-status")
+    @Operation(summary = "Update billing status for multiple tasks", description = "Updates the billing status for a list of tasks")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Tasks updated successfully"),
+        @ApiResponse(responseCode = "400", description = "Invalid input"),
+        @ApiResponse(responseCode = "401", description = "Unauthorized"),
+        @ApiResponse(responseCode = "404", description = "One or more tasks not found"),
+        @ApiResponse(responseCode = "500", description = "Internal server error")
+    })
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<TaskDTO>> updateTasksBillingStatus(
+            @Parameter(description = "List of task IDs and their billing status", required = true)
+            @Valid @RequestBody List<TaskBillingStatusUpdateDTO> taskUpdates) {
+        return ResponseEntity.ok(taskService.updateTasksBillingStatus(taskUpdates));
+    }
+
+    @PutMapping("/tasks/payment-status")
+    @Operation(summary = "Update payment status for multiple tasks", description = "Updates the payment status for a list of tasks")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Tasks updated successfully"),
+        @ApiResponse(responseCode = "400", description = "Invalid input"),
+        @ApiResponse(responseCode = "401", description = "Unauthorized"),
+        @ApiResponse(responseCode = "404", description = "One or more tasks not found"),
+        @ApiResponse(responseCode = "500", description = "Internal server error")
+    })
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<TaskDTO>> updateTasksPaymentStatus(
+            @Parameter(description = "List of task IDs and their payment status", required = true)
+            @Valid @RequestBody List<TaskPaymentStatusUpdateDTO> taskUpdates) {
+        return ResponseEntity.ok(taskService.updateTasksPaymentStatus(taskUpdates));
     }
 } 

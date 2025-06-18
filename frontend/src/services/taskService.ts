@@ -9,6 +9,19 @@ export interface PageResponse<T> {
     number: number;
 }
 
+interface TaskBillingStatusUpdate {
+    taskId: number;
+    isBilled: boolean;
+    billingDate: string; // ISO date string format
+    invoiceId: string;
+}
+
+export interface TaskPaymentStatusUpdate {
+    taskId: number;
+    isPaid: boolean;
+    paymentDate: string;
+}
+
 export const taskService = {
     // Create a new task
     async createTask(projectId: number, task: Task): Promise<Task> {
@@ -108,6 +121,16 @@ export const taskService = {
 
     async getUserUnpaidTasksByProject(projectId: number): Promise<PageResponse<Task>> {
         const response = await api.get<PageResponse<Task>>(`/user/projects/${projectId}/tasks/unpaid`);
+        return response.data;
+    },
+
+    async updateTasksBillingStatus(taskUpdates: TaskBillingStatusUpdate[]): Promise<Task[]> {
+        const response = await api.put<Task[]>(`/tasks/billing-status`, taskUpdates);
+        return response.data;
+    },
+
+    async updateTasksPaymentStatus(taskUpdates: TaskPaymentStatusUpdate[]): Promise<Task[]> {
+        const response = await api.put<Task[]>(`/tasks/payment-status`, taskUpdates);
         return response.data;
     }
 }; 

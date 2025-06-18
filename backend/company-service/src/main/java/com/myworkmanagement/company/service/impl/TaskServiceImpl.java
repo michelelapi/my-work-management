@@ -1,9 +1,13 @@
 package com.myworkmanagement.company.service.impl;
 
+import com.myworkmanagement.company.dto.TaskBillingStatusUpdateDTO;
 import com.myworkmanagement.company.dto.TaskDTO;
+import com.myworkmanagement.company.dto.TaskPaymentStatusUpdateDTO;
 import com.myworkmanagement.company.entity.Project;
 import com.myworkmanagement.company.entity.Task;
 import com.myworkmanagement.company.exception.ResourceNotFoundException;
+import com.myworkmanagement.company.exception.TaskBillingStatusException;
+import com.myworkmanagement.company.exception.TaskPaymentStatusException;
 import com.myworkmanagement.company.repository.ProjectRepository;
 import com.myworkmanagement.company.repository.TaskRepository;
 import com.myworkmanagement.company.service.TaskService;
@@ -14,7 +18,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -212,7 +218,7 @@ public class TaskServiceImpl implements TaskService {
     public Page<TaskDTO> getTasksByUserEmail(String userEmail, Pageable pageable, String search) {
         if (search != null && !search.trim().isEmpty()) {
             String searchTerm = search.toLowerCase();
-            return taskRepository.findByUserEmailAndTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCaseOrTicketIdContainingIgnoreCase(userEmail, searchTerm, searchTerm, searchTerm, pageable)
+            return taskRepository.findByUserEmailAndSearch(userEmail, searchTerm, searchTerm, searchTerm, searchTerm, pageable)
                     .map(this::convertToDTO);
         } else {
             return taskRepository.findByUserEmail(userEmail, pageable)
@@ -307,6 +313,43 @@ public class TaskServiceImpl implements TaskService {
     public Page<TaskDTO> getUnpaidTasksByUserEmailAndProject(String userEmail, Long projectId, Pageable pageable) {
         return taskRepository.findByUserEmailAndProjectIdAndIsPaidFalse(userEmail, projectId, pageable)
                 .map(this::convertToDTO);
+    }
+
+    @Override
+    @Transactional
+    public List<TaskDTO> updateTasksBillingStatus(List<TaskBillingStatusUpdateDTO> taskUpdates) {
+        List<TaskDTO> updatedTasks = new ArrayList<>();
+        
+        for (TaskBillingStatusUpdateDTO update : taskUpdates) {
+            Task task = taskRepository.findById(update.getTaskId())
+                .orElseThrow(() -> new TaskBillingStatusException("Task not found with id: " + update.getTaskId()));
+            
+            task.setIsBilled(update.getIsBilled());
+            task.setBillingDate(update.getBillingDate());
+            task.setInvoiceId(update.getInvoiceId());
+            Task savedTask = taskRepository.save(task);
+            updatedTasks.add(convertToDTO(savedTask));
+        }
+        
+        return updatedTasks;
+    }
+
+    @Override
+    @Transactional
+    public List<TaskDTO> updateTasksPaymentStatus(List<TaskPaymentStatusUpdateDTO> taskUpdates) {
+        List<TaskDTO> updatedTasks = new ArrayList<>();
+        
+        for (TaskPaymentStatusUpdateDTO update : taskUpdates) {
+            Task task = taskRepository.findById(update.getTaskId())
+                .orElseThrow(() -> new TaskPaymentStatusException("Task not found with id: " + update.getTaskId()));
+            
+            task.setIsPaid(update.getIsPaid());
+            task.setPaymentDate(update.getPaymentDate());
+            Task savedTask = taskRepository.save(task);
+            updatedTasks.add(convertToDTO(savedTask));
+        }
+        
+        return updatedTasks;
     }
 
     private TaskDTO convertToDTO(Task task) {

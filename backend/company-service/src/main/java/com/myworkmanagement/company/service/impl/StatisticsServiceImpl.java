@@ -27,6 +27,14 @@ public class StatisticsServiceImpl implements StatisticsService {
                     Long taskCount = taskRepository.countByCompanyId(company.getId());
                     Integer totalHours = taskRepository.sumHoursByCompanyId(company.getId());
                     BigDecimal totalAmount = taskRepository.sumAmountByCompanyId(company.getId());
+                    BigDecimal totalToBeBilledAmount = taskRepository.sumAmountByCompanyIdAndIsBilled(company.getId(), false);
+                    BigDecimal totalToBePaidAmount = taskRepository.sumAmountByCompanyIdAndIsPaid(company.getId(), false);
+                    // Get the first project's currency for the company, or default to 'EUR'
+                    String currency = projectRepository.findByCompanyId(company.getId(), org.springframework.data.domain.PageRequest.of(0, 1))
+                        .stream()
+                        .findFirst()
+                        .map(project -> project.getCurrency() != null ? project.getCurrency() : "EUR")
+                        .orElse("EUR");
                     
                     return CompanyProjectStatsDTO.builder()
                             .companyId(company.getId())
@@ -35,6 +43,9 @@ public class StatisticsServiceImpl implements StatisticsService {
                             .taskCount(taskCount)
                             .totalHours(totalHours != null ? totalHours : 0)
                             .totalAmount(totalAmount != null ? totalAmount : BigDecimal.ZERO)
+                            .totalToBeBilledAmount(totalToBeBilledAmount != null ? totalToBeBilledAmount : BigDecimal.ZERO)
+                            .totalToBePaidAmount(totalToBePaidAmount != null ? totalToBePaidAmount : BigDecimal.ZERO)
+                            .currency(currency)
                             .build();
                 })
                 .collect(Collectors.toList());

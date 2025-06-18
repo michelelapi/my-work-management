@@ -7,6 +7,9 @@ export interface CompanyProjectStats {
     taskCount: number;
     totalHours: number;
     totalAmount: number;
+    totalToBeBilledAmount: number;
+    totalToBePaidAmount: number;
+    currency: string;
 }
 
 export interface ProjectCost {

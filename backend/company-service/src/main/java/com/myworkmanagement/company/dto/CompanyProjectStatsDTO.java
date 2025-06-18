@@ -30,4 +30,13 @@ public class CompanyProjectStatsDTO {
 
     @Schema(description = "Total amount billed for all tasks", example = "10000.00")
     private BigDecimal totalAmount;
+
+    @Schema(description = "Total amount for tasks to be billed (isBilled = false)", example = "1200.00")
+    private BigDecimal totalToBeBilledAmount;
+
+    @Schema(description = "Total amount for tasks to be paid (isPaid = false)", example = "800.00")
+    private BigDecimal totalToBePaidAmount;
+
+    @Schema(description = "Currency code for the company/project", example = "EUR")
+    private String currency;
 } 

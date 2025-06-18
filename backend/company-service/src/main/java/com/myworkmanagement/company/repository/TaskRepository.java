@@ -64,4 +64,10 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     @Query("SELECT COALESCE(SUM(t.rateUsed * t.hoursWorked), 0) FROM Task t JOIN t.project p WHERE p.company.id = :companyId")
     BigDecimal sumAmountByCompanyId(@Param("companyId") Long companyId);
 
+    @Query("SELECT COALESCE(SUM(t.rateUsed * t.hoursWorked), 0) FROM Task t JOIN t.project p WHERE p.company.id = :companyId AND t.isBilled = :isBilled")
+    BigDecimal sumAmountByCompanyIdAndIsBilled(@Param("companyId") Long companyId, @Param("isBilled") boolean isBilled);
+
+    @Query("SELECT COALESCE(SUM(t.rateUsed * t.hoursWorked), 0) FROM Task t JOIN t.project p WHERE p.company.id = :companyId AND t.isPaid = :isPaid")
+    BigDecimal sumAmountByCompanyIdAndIsPaid(@Param("companyId") Long companyId, @Param("isPaid") boolean isPaid);
+
 } 

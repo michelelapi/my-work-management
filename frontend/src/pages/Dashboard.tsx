@@ -11,12 +11,9 @@ const Dashboard: React.FC = () => {
         <p className="text-gray-700 dark:text-gray-400">Here's a summary of your financial overview.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Company Overview horizontal layout */}
+      <div className=" w-full mb-6">
         <CompanyStats />
-        <div className="bg-gray-100 dark:bg-gray-800 p-6 rounded-lg shadow-md">
-          <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">Recent Transactions</h3>
-          <p className="text-gray-700 dark:text-gray-400">See your latest income and expenses.</p>
-        </div>
       </div>
 
       <div className="mt-6">

@@ -38,6 +38,23 @@ const TaskListPage: React.FC = () => {
     const [selectedPaymentStatus, setSelectedPaymentStatus] = useState<boolean | null>(null);
     const [paymentDate, setPaymentDate] = useState<string>(new Date().toISOString().split('T')[0]);
 
+    // Info For Bill modal state
+    const [infoForBillModalOpen, setInfoForBillModalOpen] = useState(false);
+    const [copiedField, setCopiedField] = useState<string | null>(null);
+
+    // Type filter state
+    const [typeFilter, setTypeFilter] = useState<string | null>(null);
+
+    // Compute info for bill
+    const taskIdsString = tasks.map(task => task.ticketId).join(', ');
+    const totalAmount = tasks.reduce((sum, task) => sum + (task.hoursWorked * (task.rateUsed ?? 0)), 0);
+
+    const handleCopy = (value: string, field: string) => {
+        navigator.clipboard.writeText(value);
+        setCopiedField(field);
+        setTimeout(() => setCopiedField(null), 1000);
+    };
+
     // Debounce search term
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -57,7 +74,11 @@ const TaskListPage: React.FC = () => {
                     pageSize,
                     debouncedSearchTerm // Use debounced search term
                 );
-                setTasks(response.content);
+                let filteredTasks = response.content;
+                if (typeFilter) {
+                    filteredTasks = filteredTasks.filter(task => task.type === typeFilter);
+                }
+                setTasks(filteredTasks);
                 setTotalPages(response.totalPages);
                 setTotalElements(response.totalElements);
         
@@ -71,7 +92,7 @@ const TaskListPage: React.FC = () => {
 
         fetchTasks();
 
-    }, [projectId, currentPage, pageSize, debouncedSearchTerm]); // Use debounced search term in dependencies
+    }, [projectId, currentPage, pageSize, debouncedSearchTerm, typeFilter]); // Add typeFilter to dependencies
 
     useEffect(() => {
         if (searchTermRef.current && !loading) {
@@ -257,7 +278,7 @@ const TaskListPage: React.FC = () => {
                         className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md transition-colors flex items-center"
                     >
                         <FaCheck className="mr-2" />
-                        Update Status Billed
+                        Update Status Billing
                     </button>
                     <button
                         onClick={() => setPaymentStatusModalOpen(true)}
@@ -265,6 +286,12 @@ const TaskListPage: React.FC = () => {
                     >
                         <FaCheck className="mr-2" />
                         Update Status Payment
+                    </button>
+                    <button
+                        onClick={() => setInfoForBillModalOpen(true)}
+                        className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-md transition-colors flex items-center"
+                    >
+                        Info For Bill
                     </button>
                     <button
                         onClick={() => navigate('/tasks/new')}
@@ -441,16 +468,90 @@ const TaskListPage: React.FC = () => {
                 </div>
             )}
 
+            {/* Info For Bill Modal */}
+            {infoForBillModalOpen && (
+                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
+                    <div className="relative p-5 border w-96 shadow-lg rounded-md bg-white dark:bg-gray-800">
+                        <div className="mt-3 text-center">
+                            <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white mt-2 mb-4">
+                                Info For Bill
+                            </h3>
+                            <div className="flex flex-col items-start space-y-4">
+                                <div className="w-full">
+                                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Task IDs</label>
+                                    <div className="flex items-center space-x-2">
+                                        <input
+                                            type="text"
+                                            readOnly
+                                            value={taskIdsString}
+                                            className="flex-1 px-2 py-1 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white text-xs"
+                                        />
+                                        <button
+                                            onClick={() => handleCopy(taskIdsString, 'ids')}
+                                            className="px-2 py-1 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 text-xs"
+                                        >
+                                            {copiedField === 'ids' ? 'Copied!' : 'Copy'}
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="w-full">
+                                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Total Amount</label>
+                                    <div className="flex items-center space-x-2">
+                                        <input
+                                            type="text"
+                                            readOnly
+                                            value={totalAmount.toFixed(2)}
+                                            className="flex-1 px-2 py-1 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white text-xs"
+                                        />
+                                        <button
+                                            onClick={() => handleCopy(totalAmount.toFixed(2), 'amount')}
+                                            className="px-2 py-1 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 text-xs"
+                                        >
+                                            {copiedField === 'amount' ? 'Copied!' : 'Copy'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex justify-center space-x-4 mt-6">
+                                <button
+                                    onClick={() => setInfoForBillModalOpen(false)}
+                                    className="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Filter and Page Size Controls */}
             <div className="flex flex-col md:flex-row justify-between items-center mb-4 space-y-4 md:space-y-0 md:space-x-4">
-                <input
-                    type="text"
-                    placeholder="Search tasks..."
-                    ref={searchTermRef}
-                    value={searchTerm}
-                    onChange={handleSearchChange}
-                    className="w-full md:w-1/3 p-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                />
+                <div className="flex items-center w-full md:w-1/3">
+                    <input
+                        type="text"
+                        placeholder="Search tasks..."
+                        ref={searchTermRef}
+                        value={searchTerm}
+                        onChange={handleSearchChange}
+                        className="flex-1 p-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    />
+                    <div className="flex items-center ml-4">
+                        <label className="text-gray-700 dark:text-gray-300 text-sm mr-2">Evolutiva</label>
+                        <input
+                            type="checkbox"
+                            checked={typeFilter === 'EVOLUTIVA'}
+                            onChange={e => setTypeFilter(e.target.checked ? 'EVOLUTIVA' : null)}
+                            className="mr-2"
+                        />
+                        <label className="text-gray-700 dark:text-gray-300 text-sm mr-2">Correttiva</label>
+                        <input
+                            type="checkbox"
+                            checked={typeFilter === 'CORRETTIVA'}
+                            onChange={e => setTypeFilter(e.target.checked ? 'CORRETTIVA' : null)}
+                        />
+                    </div>
+                </div>
                 <div className="flex items-center space-x-2">
                     <label htmlFor="pageSizeSelect" className="text-gray-700 dark:text-gray-300">Items per page:</label>
                     <select
@@ -481,6 +582,7 @@ const TaskListPage: React.FC = () => {
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-2/12">Project</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/12">Start Date</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/12">Hours</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/12">Type</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/12">Status</th>
                                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/12">Actions</th>
                             </tr>
@@ -510,6 +612,11 @@ const TaskListPage: React.FC = () => {
                                     <td className="px-6 py-4 break-words w-1/12">
                                         <div className="text-sm text-gray-500 dark:text-gray-300">
                                             {task.hoursWorked} hours
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4 break-words w-1/12">
+                                        <div className="text-sm text-gray-500 dark:text-gray-300">
+                                            {task.type || '-'}
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 break-words w-1/12">

@@ -42,6 +42,11 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     Page<Task> findByUserEmailAndProjectIdAndIsBilledFalse(String userEmail, Long projectId, Pageable pageable);
     Page<Task> findByUserEmailAndProjectIdAndIsPaidFalse(String userEmail, Long projectId, Pageable pageable);
 
+    // New methods for search functionality
+    Page<Task> findByUserEmailAndTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCaseOrTicketIdContainingIgnoreCase(String userEmail, String title, String description, String ticketId, Pageable pageable);
+    Page<Task> findByProjectIdAndTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCaseOrTicketIdContainingIgnoreCase(Long projectId, String title, String description, String ticketId, Pageable pageable);
+    Page<Task> findByUserEmailAndProjectIdAndTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCaseOrTicketIdContainingIgnoreCase(String userEmail, Long projectId, String title, String description, String ticketId, Pageable pageable);
+
     @Query("SELECT COUNT(t) FROM Task t JOIN t.project p WHERE p.company.id = :companyId")
     Long countByCompanyId(@Param("companyId") Long companyId);
     

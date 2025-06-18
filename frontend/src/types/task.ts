@@ -9,7 +9,7 @@ export interface Task {
     endDate?: string;
     hoursWorked: number;
     rateUsed?: number;
-    rateType?: string;
+    type?: string;
     currency?: string;
     isBilled?: boolean;
     isPaid?: boolean;

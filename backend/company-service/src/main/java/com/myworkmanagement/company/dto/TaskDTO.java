@@ -48,10 +48,10 @@ public class TaskDTO {
     @Schema(description = "Rate used for billing this task", example = "62.50")
     private BigDecimal rateUsed;
 
-    @Schema(description = "Type of rate used (hourly/daily)", example = "hourly")
-    private String rateType;
+    @Schema(description = "Type of project Evolutiva/Correttiva", example = "Correttiva")
+    private String type;
 
-    @Schema(description = "Currency code for the rate", example = "USD")
+    @Schema(description = "Currency code for the rate", example = "EUR")
     private String currency;
 
     @Schema(description = "Indicates if the task has been billed", example = "false")

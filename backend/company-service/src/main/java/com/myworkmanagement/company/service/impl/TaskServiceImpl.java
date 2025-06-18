@@ -39,7 +39,7 @@ public class TaskServiceImpl implements TaskService {
                 .endDate(taskDTO.getEndDate())
                 .hoursWorked(taskDTO.getHoursWorked())
                 .rateUsed(taskDTO.getRateUsed())
-                .rateType(taskDTO.getRateType())
+                .type(taskDTO.getType())
                 .currency(taskDTO.getCurrency())
                 .isBilled(taskDTO.getIsBilled())
                 .isPaid(taskDTO.getIsPaid())
@@ -71,7 +71,7 @@ public class TaskServiceImpl implements TaskService {
         task.setEndDate(taskDTO.getEndDate());
         task.setHoursWorked(taskDTO.getHoursWorked());
         task.setRateUsed(taskDTO.getRateUsed());
-        task.setRateType(taskDTO.getRateType());
+        task.setType(taskDTO.getType());
         task.setCurrency(taskDTO.getCurrency());
         task.setIsBilled(taskDTO.getIsBilled());
         task.setIsPaid(taskDTO.getIsPaid());
@@ -208,72 +208,102 @@ public class TaskServiceImpl implements TaskService {
     }
 
     @Override
-    public Page<TaskDTO> getTasksByUserEmail(String userEmail, Pageable pageable) {
-        return taskRepository.findByUserEmail(userEmail, pageable)
-                .map(this::convertToDTO);
+    @Transactional(readOnly = true)
+    public Page<TaskDTO> getTasksByUserEmail(String userEmail, Pageable pageable, String search) {
+        if (search != null && !search.trim().isEmpty()) {
+            String searchTerm = search.toLowerCase();
+            return taskRepository.findByUserEmailAndTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCaseOrTicketIdContainingIgnoreCase(userEmail, searchTerm, searchTerm, searchTerm, pageable)
+                    .map(this::convertToDTO);
+        } else {
+            return taskRepository.findByUserEmail(userEmail, pageable)
+                    .map(this::convertToDTO);
+        }
     }
 
     @Override
-    public Page<TaskDTO> getTasksByProject(Long projectId, Pageable pageable) {
-        return taskRepository.findByProjectId(projectId, pageable)
-                .map(this::convertToDTO);
+    @Transactional(readOnly = true)
+    public Page<TaskDTO> getTasksByProject(Long projectId, Pageable pageable, String search) {
+        if (search != null && !search.trim().isEmpty()) {
+            String searchTerm = search.toLowerCase();
+            return taskRepository.findByProjectIdAndTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCaseOrTicketIdContainingIgnoreCase(projectId, searchTerm, searchTerm, searchTerm, pageable)
+                    .map(this::convertToDTO);
+        } else {
+            return taskRepository.findByProjectId(projectId, pageable)
+                    .map(this::convertToDTO);
+        }
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Page<TaskDTO> getTasksByProjectAndDateRange(Long projectId, LocalDate startDate, LocalDate endDate, Pageable pageable) {
         return taskRepository.findByProjectIdAndStartDateBetween(projectId, startDate, endDate, pageable)
                 .map(this::convertToDTO);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Page<TaskDTO> getUnbilledTasks(Pageable pageable) {
         return taskRepository.findByIsBilledFalse(pageable)
                 .map(this::convertToDTO);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Page<TaskDTO> getUnpaidTasks(Pageable pageable) {
         return taskRepository.findByIsPaidFalse(pageable)
                 .map(this::convertToDTO);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Page<TaskDTO> getUnbilledTasksByProject(Long projectId, Pageable pageable) {
         return taskRepository.findByProjectIdAndIsBilledFalse(projectId, pageable)
                 .map(this::convertToDTO);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Page<TaskDTO> getUnpaidTasksByProject(Long projectId, Pageable pageable) {
         return taskRepository.findByProjectIdAndIsPaidFalse(projectId, pageable)
                 .map(this::convertToDTO);
     }
 
     @Override
-    public Page<TaskDTO> getTasksByUserEmailAndProject(String userEmail, Long projectId, Pageable pageable) {
-        return taskRepository.findByUserEmailAndProjectId(userEmail, projectId, pageable)
-                .map(this::convertToDTO);
+    @Transactional(readOnly = true)
+    public Page<TaskDTO> getTasksByUserEmailAndProject(String userEmail, Long projectId, Pageable pageable, String search) {
+        if (search != null && !search.trim().isEmpty()) {
+            String searchTerm = search.toLowerCase();
+            return taskRepository.findByUserEmailAndProjectIdAndTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCaseOrTicketIdContainingIgnoreCase(userEmail, projectId, searchTerm, searchTerm, searchTerm, pageable)
+                    .map(this::convertToDTO);
+        } else {
+            return taskRepository.findByUserEmailAndProjectId(userEmail, projectId, pageable)
+                    .map(this::convertToDTO);
+        }
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Page<TaskDTO> getUnbilledTasksByUserEmail(String userEmail, Pageable pageable) {
         return taskRepository.findByUserEmailAndIsBilledFalse(userEmail, pageable)
                 .map(this::convertToDTO);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Page<TaskDTO> getUnpaidTasksByUserEmail(String userEmail, Pageable pageable) {
         return taskRepository.findByUserEmailAndIsPaidFalse(userEmail, pageable)
                 .map(this::convertToDTO);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Page<TaskDTO> getUnbilledTasksByUserEmailAndProject(String userEmail, Long projectId, Pageable pageable) {
         return taskRepository.findByUserEmailAndProjectIdAndIsBilledFalse(userEmail, projectId, pageable)
                 .map(this::convertToDTO);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Page<TaskDTO> getUnpaidTasksByUserEmailAndProject(String userEmail, Long projectId, Pageable pageable) {
         return taskRepository.findByUserEmailAndProjectIdAndIsPaidFalse(userEmail, projectId, pageable)
                 .map(this::convertToDTO);
@@ -283,6 +313,7 @@ public class TaskServiceImpl implements TaskService {
         return TaskDTO.builder()
                 .id(task.getId())
                 .projectId(task.getProject().getId())
+                .projectName(task.getProject().getName())
                 .title(task.getTitle())
                 .description(task.getDescription())
                 .ticketId(task.getTicketId())
@@ -290,7 +321,7 @@ public class TaskServiceImpl implements TaskService {
                 .endDate(task.getEndDate())
                 .hoursWorked(task.getHoursWorked())
                 .rateUsed(task.getRateUsed())
-                .rateType(task.getRateType())
+                .type(task.getType())
                 .currency(task.getCurrency())
                 .isBilled(task.getIsBilled())
                 .isPaid(task.getIsPaid())
@@ -301,8 +332,6 @@ public class TaskServiceImpl implements TaskService {
                 .userEmail(task.getUserEmail())
                 .createdAt(task.getCreatedAt())
                 .updatedAt(task.getUpdatedAt())
-                .projectName(task.getProject().getName())
-                .companyName(task.getProject().getCompany().getName())
                 .build();
     }
 } 

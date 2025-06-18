@@ -5,11 +5,14 @@ import { CompanyContact } from '../types/companyContact';
 import { Project, ProjectStatus } from '../types/project';
 import companyService from '../services/companyService';
 import projectService from '../services/projectService';
+import { FaPen } from "@react-icons/all-files/fa/FaPen"
+import { FaTrash } from "@react-icons/all-files/fa/FaTrash"
 
 interface CompanySectionsState {
   isProjectsExpanded: boolean;
   isContactsExpanded: boolean;
 }
+
 
 const CompanyDetailsPage: React.FC = () => {
   const { companyId } = useParams<{ companyId: string }>();
@@ -339,14 +342,16 @@ const CompanyDetailsPage: React.FC = () => {
                           <button
                             onClick={() => navigate(`/companies/${company.id}/projects/${project.id}/edit`)}
                             className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-4"
+                            title="Edit"
                           >
-                            Edit
+                            <FaPen size={16} className="inline-block" />
                           </button>
                           <button
                             onClick={() => openDeleteProjectModal(project)}
                             className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                            title="Delete"
                           >
-                            Delete
+                            <FaTrash size={16} className="inline-block" />
                           </button>
                         </td>
                       </tr>
@@ -435,14 +440,16 @@ const CompanyDetailsPage: React.FC = () => {
                           <button
                             onClick={() => navigate(`/companies/${company.id}/contacts/${contact.id}/edit`)}
                             className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-4"
+                            title="Edit"
                           >
-                            Edit
+                            <FaPen size={16} className="inline-block" />
                           </button>
                           <button
                             onClick={() => openDeleteContactModal(contact)}
                             className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                            title="Delete"
                           >
-                            Delete
+                            <FaTrash size={16} className="inline-block" />
                           </button>
                         </td>
                       </tr>

@@ -26,6 +26,7 @@ class UserRequest(BaseModel):
     text: str
     auth_token: Optional[str] = None
     user_email: str
+    output_format: Optional[str] = None # New field: 'json', 'table', or 'text'
 
 class EndpointInfo(BaseModel):
     path: str
@@ -1054,6 +1055,39 @@ def format_as_table(data: List[Dict]) -> str:
     
     return table
 
+def format_as_html(data: List[Dict]) -> str:
+    """Format data as an HTML table"""
+    if not data:
+        return "<p>No data found</p>"
+
+    # Get all unique keys from all items
+    headers = set()
+    for item in data:
+        headers.update(item.keys())
+    headers = sorted(list(headers))
+
+    html_table = "<table border=\"1\" style=\"width:100%; border-collapse: collapse;\">\n"
+    html_table += "  <thead>\n    <tr>"
+    for header in headers:
+        html_table += f"<th>{header}</th>"
+    html_table += "</tr>\n  </thead>\n"
+
+    html_table += "  <tbody>\n"
+    for item in data:
+        html_table += "    <tr>"
+        for header in headers:
+            value = item.get(header, "")
+            if value is None:
+                value = ""
+            elif isinstance(value, (dict, list)):
+                value = json.dumps(value) # Represent nested structures as JSON strings
+            html_table += f"<td>{value}</td>"
+        html_table += "</tr>\n"
+    html_table += "  </tbody>\n"
+    html_table += "</table>"
+
+    return html_table
+
 def format_as_text(data: List[Dict]) -> str:
     """Format data as plain text with key-value pairs"""
     if not data:
@@ -1133,11 +1167,50 @@ async def process_request(request: UserRequest):
         # Execute plan
         results = await orchestrator.execute_plan(execution_plan)
         
+        formatted_output = results # Default to raw results (which FastAPI will JSON serialize)
+
+        if request.output_format:
+            # Assuming the last step's result is the primary output for formatting
+            if execution_plan['execution_plan']:
+                last_step_name = f"step_{execution_plan['execution_plan'][-1]['step']}"
+                final_output_data = results.get(last_step_name)
+
+                if final_output_data:
+                    # Try to extract 'content' if it's a dictionary and has that key
+                    data_for_formatting_candidate = final_output_data
+                    if isinstance(data_for_formatting_candidate, dict) and 'content' in data_for_formatting_candidate:
+                        logger.info("Extracting 'content' section from last step's result for formatting.")
+                        data_for_formatting_candidate = data_for_formatting_candidate['content']
+
+                    # Ensure data_for_formatting_candidate is a list of dicts for formatting functions
+                    data_to_format = []
+                    if isinstance(data_for_formatting_candidate, dict):
+                        data_to_format = [data_for_formatting_candidate]
+                    elif isinstance(data_for_formatting_candidate, list):
+                        data_to_format = data_for_formatting_candidate
+                    
+                    if data_to_format:
+                        if request.output_format.lower() == "table":
+                            formatted_output = format_as_table(data_to_format)
+                        elif request.output_format.lower() == "text":
+                            formatted_output = format_as_text(data_to_format)
+                        elif request.output_format.lower() == "html":
+                            formatted_output = format_as_html(data_to_format)
+                        # else: default to raw results (JSON) already handled by FastAPI
+                    else:
+                        logger.warning(f"Final output data for formatting is empty or not a dict/list: {final_output_data}")
+                else:
+                    logger.warning(f"Last step '{last_step_name}' produced no output, cannot format.")
+                    formatted_output = f"No results from last step to format as {request.output_format}."
+            else:
+                logger.warning("No steps in execution plan, cannot determine final output for formatting.")
+                formatted_output = f"No execution plan to retrieve results for formatting as {request.output_format}."
+
         return {
             "status": "success",
             "intent": intent,
             "execution_plan": execution_plan,
-            "results": results
+            "results": formatted_output # This will now contain the formatted string or the original dict
         }
         
     except Exception as e:

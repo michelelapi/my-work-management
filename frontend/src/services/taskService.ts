@@ -33,12 +33,18 @@ export const taskService = {
         return response.data;
     },
 
-    // Get all tasks for the authenticated user
-    async getTasks(projectId?: number): Promise<PageResponse<Task>> {
+    // Get all tasks for the authenticated user with pagination and filtering
+    async getTasks(projectId?: number, page: number = 0, size: number = 10, searchTerm?: string): Promise<PageResponse<Task>> {
         const url = projectId 
             ? `/projects/${projectId}/tasks`
             : '/tasks';
-        const response = await api.get<PageResponse<Task>>(url);
+        const params: any = { page, size };
+        if (searchTerm) {
+            params.search = searchTerm;
+        }
+        const response = await api.get<PageResponse<Task>>(url, {
+            params
+        });
         return response.data;
     },
 

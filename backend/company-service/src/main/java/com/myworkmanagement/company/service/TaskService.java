@@ -28,15 +28,15 @@ public interface TaskService {
     List<TaskDTO> getUnbilledTasksByUserEmailAndProject(String userEmail, Long projectId);
     List<TaskDTO> getUnpaidTasksByUserEmailAndProject(String userEmail, Long projectId);
 
-    // Paginated methods
-    Page<TaskDTO> getTasksByUserEmail(String userEmail, Pageable pageable);
-    Page<TaskDTO> getTasksByProject(Long projectId, Pageable pageable);
+    // Paginated methods with search
+    Page<TaskDTO> getTasksByUserEmail(String userEmail, Pageable pageable, String search);
+    Page<TaskDTO> getTasksByProject(Long projectId, Pageable pageable, String search);
     Page<TaskDTO> getTasksByProjectAndDateRange(Long projectId, LocalDate startDate, LocalDate endDate, Pageable pageable);
     Page<TaskDTO> getUnbilledTasks(Pageable pageable);
     Page<TaskDTO> getUnpaidTasks(Pageable pageable);
     Page<TaskDTO> getUnbilledTasksByProject(Long projectId, Pageable pageable);
     Page<TaskDTO> getUnpaidTasksByProject(Long projectId, Pageable pageable);
-    Page<TaskDTO> getTasksByUserEmailAndProject(String userEmail, Long projectId, Pageable pageable);
+    Page<TaskDTO> getTasksByUserEmailAndProject(String userEmail, Long projectId, Pageable pageable, String search);
     Page<TaskDTO> getUnbilledTasksByUserEmail(String userEmail, Pageable pageable);
     Page<TaskDTO> getUnpaidTasksByUserEmail(String userEmail, Pageable pageable);
     Page<TaskDTO> getUnbilledTasksByUserEmailAndProject(String userEmail, Long projectId, Pageable pageable);

@@ -344,19 +344,19 @@ const TaskFormPage: React.FC = () => {
 
                 {/* Rate Type */}
                 <div>
-                    <label htmlFor="rateType" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Rate Type
+                    <label htmlFor="type" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Project Type
                     </label>
                     <select
-                        name="rateType"
-                        id="rateType"
-                        value={task.rateType || ''}
+                        name="type"
+                        id="type"
+                        value={task.type || ''}
                         onChange={handleChange}
                         className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:border-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
                     >
-                        <option value="">-- Select Rate Type --</option>
-                        <option value="HOURLY">Hourly</option>
-                        <option value="DAILY">Daily</option>
+                        <option value="">-- Select Project Type --</option>
+                        <option value="EVOLUTIVA">Evolutiva</option>
+                        <option value="CORRETTIVA">Correttiva</option>
                     </select>
                 </div>
 

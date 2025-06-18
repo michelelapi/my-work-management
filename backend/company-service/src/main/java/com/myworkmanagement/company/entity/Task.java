@@ -48,8 +48,8 @@ public class Task {
     @Column(name = "rate_used", precision = 10, scale = 2)
     private BigDecimal rateUsed;
 
-    @Column(name = "rate_type", length = 6)
-    private String rateType;
+    @Column(name = "type", length = 6)
+    private String type;
 
     @Column(length = 3)
     private String currency;

@@ -2,6 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { Project, ProjectStatus } from '../types/project';
 import projectService from '../services/projectService';
+import { FaPen } from "@react-icons/all-files/fa/FaPen"
+import { FaTrash } from "@react-icons/all-files/fa/FaTrash"
+import { FaEye } from "@react-icons/all-files/fa/FaEye"
+
 
 const ProjectListPage: React.FC = () => {
   const { companyId } = useParams<{ companyId: string }>();
@@ -175,19 +179,21 @@ const ProjectListPage: React.FC = () => {
                       to={`/companies/${project.companyId}/projects/${project.id}`}
                       className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 mr-4"
                     >
-                      View
+                      <FaEye size={16} className="inline-block" /> 
                     </Link>
                     <Link
                       to={`/companies/${project.companyId}/projects/${project.id}/edit`}
                       className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-4"
+                      title="Edit"
                     >
-                      Edit
+                      <FaPen size={16} className="inline-block" />
                     </Link>
                     <button
                       onClick={() => openDeleteModal(project)}
                       className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                      title="Delete"
                     >
-                      Delete
+                      <FaTrash size={16} className="inline-block" />
                     </button>
                   </td>
                 </tr>

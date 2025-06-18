@@ -1,5 +1,6 @@
 import React from 'react';
 import CompanyStats from '../components/CompanyStats';
+import ProjectCostsChart from '../components/ProjectCostsChart';
 
 const Dashboard: React.FC = () => {
   return (
@@ -16,6 +17,10 @@ const Dashboard: React.FC = () => {
           <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">Recent Transactions</h3>
           <p className="text-gray-700 dark:text-gray-400">See your latest income and expenses.</p>
         </div>
+      </div>
+
+      <div className="mt-6">
+        <ProjectCostsChart />
       </div>
     </div>
   );

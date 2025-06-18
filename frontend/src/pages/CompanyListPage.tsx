@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Company } from '../types/company';
 import companyService from '../services/companyService';
+import { FaPen } from "@react-icons/all-files/fa/FaPen"
+import { FaTrash } from "@react-icons/all-files/fa/FaTrash"
+import { FaEye } from '@react-icons/all-files/fa/FaEye';
 
 const CompanyListPage: React.FC = () => {
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -150,19 +153,21 @@ const CompanyListPage: React.FC = () => {
                       to={`/companies/${company.id}`}
                       className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 mr-4"
                     >
-                      View
+                      <FaEye size={16} className="inline-block" /> 
                     </Link>
                     <Link
                       to={`/companies/${company.id}/edit`}
                       className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-4"
+                      title="Edit"
                     >
-                      Edit
+                      <FaPen size={16} className="inline-block" />
                     </Link>
                     <button
                       onClick={() => openDeleteModal(company)}
                       className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                      title="Delete"
                     >
-                      Delete
+                      <FaTrash size={16} className="inline-block" />
                     </button>
                   </td>
                 </tr>

@@ -95,10 +95,11 @@ public class TaskController {
     })
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
     public ResponseEntity<Page<TaskDTO>> getAllTasks(
-            @Parameter(description = "Pagination parameters (page, size, sort)", required = false) Pageable pageable) {
+            @Parameter(description = "Pagination parameters (page, size, sort)", required = false) Pageable pageable,
+            @Parameter(description = "Search term to filter tasks by title, description, or ticket ID", required = false) @RequestParam(required = false) String search) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String userEmail = authentication.getName();
-        return ResponseEntity.ok(taskService.getTasksByUserEmail(userEmail, pageable));
+        return ResponseEntity.ok(taskService.getTasksByUserEmail(userEmail, pageable, search));
     }
 
     @GetMapping("/projects/{projectId}/tasks")
@@ -112,8 +113,9 @@ public class TaskController {
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
     public ResponseEntity<Page<TaskDTO>> getTasksByProject(
             @Parameter(description = "Unique identifier of the project", required = true, example = "1") @PathVariable Long projectId,
-            @Parameter(description = "Pagination parameters (page, size, sort)", required = false) Pageable pageable) {
-        return ResponseEntity.ok(taskService.getTasksByProject(projectId, pageable));
+            @Parameter(description = "Pagination parameters (page, size, sort)", required = false) Pageable pageable,
+            @Parameter(description = "Search term to filter tasks by title, description, or ticket ID", required = false) @RequestParam(required = false) String search) {
+        return ResponseEntity.ok(taskService.getTasksByProject(projectId, pageable, search));
     }
 
     @GetMapping("/projects/{projectId}/tasks/date-range")
@@ -215,10 +217,11 @@ public class TaskController {
     })
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
     public ResponseEntity<Page<TaskDTO>> getTasksByUserEmail(
-            @Parameter(description = "Pagination parameters (page, size, sort)", required = false) Pageable pageable) {
+            @Parameter(description = "Pagination parameters (page, size, sort)", required = false) Pageable pageable,
+            @Parameter(description = "Search term to filter tasks by title, description, or ticket ID", required = false) @RequestParam(required = false) String search) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String userEmail = authentication.getName();
-        return ResponseEntity.ok(taskService.getTasksByUserEmail(userEmail, pageable));
+        return ResponseEntity.ok(taskService.getTasksByUserEmail(userEmail, pageable, search));
     }
 
     @GetMapping("/user/projects/{projectId}/tasks")
@@ -232,10 +235,11 @@ public class TaskController {
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
     public ResponseEntity<Page<TaskDTO>> getTasksByUserEmailAndProject(
             @Parameter(description = "Unique identifier of the project", required = true, example = "1") @PathVariable Long projectId,
-            @Parameter(description = "Pagination parameters (page, size, sort)", required = false) Pageable pageable) {
+            @Parameter(description = "Pagination parameters (page, size, sort)", required = false) Pageable pageable,
+            @Parameter(description = "Search term to filter tasks by title, description, or ticket ID", required = false) @RequestParam(required = false) String search) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String userEmail = authentication.getName();
-        return ResponseEntity.ok(taskService.getTasksByUserEmailAndProject(userEmail, projectId, pageable));
+        return ResponseEntity.ok(taskService.getTasksByUserEmailAndProject(userEmail, projectId, pageable, search));
     }
 
     @GetMapping("/user/tasks/unbilled")

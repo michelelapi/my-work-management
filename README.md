@@ -21,20 +21,23 @@ Built with React, Spring Boot microservices, Python AI agent, and Docker for sea
 
 Below are some key screens and features of MyWorkManagement:
 
+### Login
+![Login](docs/screenshots/login.png)
+
+### Dashboard
+![Dashboard](docs/screenshots/dashboard.png)
+
+### Company
+![Company](docs/screenshots/company.png)
+
 ### Company Details
 ![Company Details](docs/screenshots/company-details.png)
 
 ### Company Edit
 ![Company Edit](docs/screenshots/company-edit.png)
 
-### Company
-![Company](docs/screenshots/company.png)
-
-### Dashboard
-![Dashboard](docs/screenshots/dashboard.png)
-
-### Login
-![Login](docs/screenshots/login.png)
+### Project
+![Project](docs/screenshots/project.png)
 
 ### Project Details
 ![Project Details](docs/screenshots/project-details.png)
@@ -42,15 +45,11 @@ Below are some key screens and features of MyWorkManagement:
 ### Project Edit
 ![Project Edit](docs/screenshots/project-edit.png)
 
-### Project
-![Project](docs/screenshots/project.png)
-
-### Task Edit
-![Task Edit](docs/screenshots/task-edit.png)
-
 ### Task
 ![Task](docs/screenshots/task.png)
 
+### Task Edit
+![Task Edit](docs/screenshots/task-edit.png)
 
 
 ---
@@ -92,7 +91,7 @@ MyWorkManagement/
 ### 2. Clone the Repository
 
 ```sh
-git clone https://github.com/yourusername/your-repo.git
+git clone https://github.com/lapimichele/my-work-management.git
 cd MyWorkManagement
 ```
 
@@ -212,14 +211,14 @@ It is built with FastAPI and integrates with OpenAI for natural language process
 
 ### Task & Project APIs
 
-| Method | Endpoint                | Description                    |
-|--------|------------------------ |--------------------------------|
-| GET    | `/api/tasks`            | List/filter tasks              |
-| PUT    | `/api/tasks/billing-status` | Batch update billing status |
-| PUT    | `/api/tasks/payment-status` | Batch update payment status |
-| ...    | ...                     | ...                            |
+| Method | Endpoint                    | Description                    |
+|--------|---------------------------- |--------------------------------|
+| GET    | `/api/tasks`                | List/filter tasks              |
+| PUT    | `/api/tasks/billing-status` | Batch update billing status    |
+| PUT    | `/api/tasks/payment-status` | Batch update payment status    |
+| ...    | ...                         | ...                            |
 
-> For full API documentation, see the `docs/` folder or use the built-in Swagger UI at `/swagger-ui.html` for each backend service.
+> For full API documentation, use the built-in Swagger UI at `/swagger-ui.html` for each backend service.
 
 ---
 
@@ -234,21 +233,9 @@ It is built with FastAPI and integrates with OpenAI for natural language process
 
 - Ensure Docker Desktop is running before starting the script.
 - If ports are in use, adjust them in Docker Compose and backend configs.
-- For Windows, use Command Prompt (not PowerShell) to run `.bat` scripts.
+- For Windows, run `run_application.bat` scripts to start docker containers, run the backend services and frontend.
 
 ---
 
-## 🤝 Contributing
-
-See the `docs/` folder for architecture, API specs, and contribution guidelines.  
-Pull requests and issues are welcome!
-
----
-
-## 📄 License
-
-[Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0)
-
----
 
 *MyWorkManagement is designed to streamline work and financial management for self-employed professionals, with a focus on automation, analytics, and ease of use.*

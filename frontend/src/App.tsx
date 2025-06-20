@@ -16,6 +16,7 @@ import TaskListPage from './pages/TaskListPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import TaskFormPage from './pages/TaskFormPage';
 import ProjectDetailsPage from './pages/ProjectDetailsPage';
+import AiAgentPage from './pages/AiAgentPage';
 
 function App() {
   return (
@@ -52,6 +53,9 @@ function App() {
                 <Route path="/projects/:projectId/tasks" element={<ProtectedRoute><TaskListPage /></ProtectedRoute>} />
                 <Route path="/companies/:companyId/projects/:projectId/tasks/new" element={<ProtectedRoute><TaskFormPage /></ProtectedRoute>} />
                 <Route path="/companies/:companyId/projects/:projectId/tasks/:taskId/edit" element={<ProtectedRoute><TaskFormPage /></ProtectedRoute>} />
+
+                {/* AI Agent Route */}
+                <Route path="/ai-agent" element={<ProtectedRoute><AiAgentPage /></ProtectedRoute>} />
 
                 <Route path="*" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               </Routes>

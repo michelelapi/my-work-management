@@ -4,6 +4,7 @@ import requests
 import logging
 from typing import Dict, List, Optional, Tuple, Any
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import chromadb
 from chromadb.config import Settings
@@ -21,6 +22,14 @@ load_dotenv()
 
 # Initialize FastAPI app
 app = FastAPI(title="AI Agent Service")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Or specify your frontend's URL
+    allow_credentials=True,
+    allow_methods=["*"],  # Or ["POST", "OPTIONS"]
+    allow_headers=["*"],
+)
 
 class UserRequest(BaseModel):
     text: str
@@ -533,6 +542,9 @@ Return ONLY the JSON object."""
             # Only add request body parameters from the request_body section
             if "request_body" in step:
                 body_params = step["request_body"].copy()
+            # PATCH: If POST/PUT and no request_body, but parameters exist, use parameters as body
+            elif step["method"] in ["POST", "PUT"] and "parameters" in step:
+                body_params = step["parameters"].copy()
 
             # Generate cache key
             cache_key = self._get_cache_key(step['method'], url, query_params if step['method'] in ['GET', 'DELETE'] else body_params)

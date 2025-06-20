@@ -30,6 +30,9 @@ const Header: React.FC = () => {
                   <Link to="/tasks" className="hover:text-gray-300">Tasks</Link>
                 </li>
                 <li>
+                  <Link to="/ai-agent" className="hover:text-gray-300">AI Agent</Link>
+                </li>
+                <li>
                   <button onClick={logout} className="hover:text-gray-300 focus:outline-none">
                     Logout
                   </button>

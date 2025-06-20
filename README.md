@@ -74,7 +74,7 @@ MyWorkManagement/
 
 - **Frontend:** React 18, TypeScript, Tailwind CSS, React Router, Axios, Chart.js
 - **Backend:** Spring Boot 3, Spring Data JPA, PostgreSQL, OpenFeign, Validation
-- **AI Agent:** Python 3.11, FastAPI, OpenAI API, SQLAlchemy, Pandas, NumPy
+- **AI Agent:** Python 3.11, FastAPI, Claude API, SQLAlchemy, Pandas, NumPy
 - **DevOps:** Docker, Docker Compose
 
 ---
@@ -178,7 +178,7 @@ uvicorn main:app --reload
 ## 🧠 AI Agent
 
 The AI agent provides analytics, suggestions, and advanced reporting.  
-It is built with FastAPI and integrates with OpenAI for natural language processing.
+It is built with FastAPI and integrates with Claude for natural language processing.
 
 **Example Endpoints:**
 - `POST /analyze-tasks` — Get insights and suggestions for a list of tasks.

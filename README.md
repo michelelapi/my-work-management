@@ -54,8 +54,11 @@ Below are some key screens and features of MyWorkManagement:
 ### AI-Agent example (get the company called pippox)
 ![Task](docs/screenshots/ai-agent-example-1.png)
 
-### AI-Agent example (create a new company with name:pluto, phone:987, email:pippo@gmail.com, address:via ciccio )
+### AI-Agent example (create a new company with name:pluto, phone:987, email:pippo@gmail.com, address:via ciccio)
 ![Task](docs/screenshots/ai-agent-example-2.png)
+
+### AI-Agent example (get all the companies)
+![Task](docs/screenshots/ai-agent-example-3.png)
 
 ---
 

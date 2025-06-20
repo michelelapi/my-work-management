@@ -242,11 +242,5 @@ It is built with FastAPI and integrates with Claude for natural language process
 
 ---
 
-## 🩺 NEXT FEATURES IN DEVELOPEMENT
-
-- Creating a new screen to use AI-AGENT 
--- Using the AI-AGENT the user will be able to create/delete/update/search a company/project/task, using the natural language (ex. create a company called XXX with phone:123, email:zzz@gg.com,...). The AI-AGENT use Claude APIs to analyse the question, and call the right endpoint to execute the user question.
-
----
 
 *MyWorkManagement is designed to streamline work and financial management for self-employed professionals, with a focus on automation, analytics, and ease of use.*

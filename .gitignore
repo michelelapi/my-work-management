@@ -107,3 +107,4 @@ build/
 .env.development.local
 .env.test.local
 .env.production.local 
+google-sheets-credentials.json

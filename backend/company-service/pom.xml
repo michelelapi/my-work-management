@@ -87,6 +87,33 @@
             <version>0.11.5</version>
             <scope>runtime</scope>
         </dependency>
+
+<!-- Google API Client - Updated versions -->
+<dependency>
+    <groupId>com.google.api-client</groupId>
+    <artifactId>google-api-client</artifactId>
+    <version>2.0.0</version>
+</dependency>
+
+<dependency>
+    <groupId>com.google.oauth-client</groupId>
+    <artifactId>google-oauth-client-jetty</artifactId>
+    <version>1.34.1</version>
+</dependency>
+
+<!-- Updated Google Sheets API -->
+<dependency>
+    <groupId>com.google.apis</groupId>
+    <artifactId>google-api-services-sheets</artifactId>
+    <version>v4-rev20220927-2.0.0</version>
+</dependency>
+
+<!-- Add Google Auth Library -->
+<dependency>
+    <groupId>com.google.auth</groupId>
+    <artifactId>google-auth-library-oauth2-http</artifactId>
+    <version>1.19.0</version>
+</dependency>
     </dependencies>
 
     <build>
@@ -124,4 +151,5 @@
             </plugin>
         </plugins>
     </build>
+
 </project> 

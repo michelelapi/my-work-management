@@ -202,7 +202,7 @@ public class TaskController {
         @ApiResponse(responseCode = "404", description = "Task not found"),
         @ApiResponse(responseCode = "500", description = "Internal server error")
     })
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN','USER')")
     public ResponseEntity<Void> deleteTask(
             @Parameter(description = "Unique identifier of the project", required = true, example = "1") @PathVariable Long projectId,
             @Parameter(description = "Unique identifier of the task", required = true, example = "1") @PathVariable Long id) {

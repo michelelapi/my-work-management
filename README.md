@@ -52,13 +52,13 @@ Below are some key screens and features of MyWorkManagement:
 ![Task Edit](docs/screenshots/task-edit.png)
 
 ### AI-Agent example (get the company called pippox)
-![Task](docs/screenshots/ai-agent-example-1.png)
+![AI Agent Example 1](docs/screenshots/ai-agent-example-1.png)
 
 ### AI-Agent example (create a new company with name:pluto, phone:987, email:pippo@gmail.com, address:via ciccio)
-![Task](docs/screenshots/ai-agent-example-2.png)
+![AI Agent Example 2](docs/screenshots/ai-agent-example-2.png)
 
 ### AI-Agent example (get all the companies)
-![Task](docs/screenshots/ai-agent-example-3.png)
+![AI Agent Example 3](docs/screenshots/ai-agent-example-3.png)
 
 ---
 
@@ -167,8 +167,8 @@ npm start
 
 ```sh
 cd ai-agent
-pip install -r requirements.txt
-uvicorn main:app --reload
+docker build -t ai-agent-service .
+docker run -p 8000:8000 --env-file .env ai-agent-service
 ```
 </details>
 
@@ -189,8 +189,8 @@ The AI agent provides analytics, suggestions, and advanced reporting.
 It is built with FastAPI and integrates with Claude for natural language processing.
 
 **Example Endpoints:**
-- `POST /analyze-tasks` — Get insights and suggestions for a list of tasks.
-- `POST /predict-billing` — Predict billing or payment trends.
+- `POST /process-request` — Ask AI-Agent to create/search/update company/project/task.
+
 
 **How to use:**
 - Start the agent as described above.

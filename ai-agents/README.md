@@ -29,7 +29,10 @@ Send a POST request to `/process-request` with a JSON body containing the natura
 ```bash
 curl -X POST http://localhost:8000/process-request \
   -H "Content-Type: application/json" \
-  -d '{"text": "I want to create a new company called Acme Corp with email contact@acme.com"}'
+  -d '{"text": "get me all the companies",
+       "auth_token":"xxx",
+       "user_email":"john.doe@example.com",
+       "output_format": "json"}'
 ```
 
 The service will:

@@ -100,13 +100,12 @@ const TaskListPage: React.FC = () => {
         }
     }, [loading, searchTerm]);
 
-    const handleDelete = async (taskId: number) => {
+    const handleDelete = async (projectId: number, taskId: number) => {
         try {
-            if (projectId) {
-                await taskService.deleteTask(parseInt(projectId), taskId);
+                await taskService.deleteTask(projectId, taskId); 
                 // After deletion, re-fetch tasks for the current page with current filters
                 const response = await taskService.getTasks(
-                    projectId ? parseInt(projectId) : undefined,
+                    projectId ? projectId : undefined,
                     currentPage,
                     pageSize,
                     debouncedSearchTerm
@@ -116,7 +115,6 @@ const TaskListPage: React.FC = () => {
                 setTotalElements(response.totalElements);
                 setDeleteModalOpen(false);
                 setTaskToDelete(null);
-            }
         } catch (err) {
             setError('Failed to delete task. Please try again later.');
             console.error('Error deleting task:', err);
@@ -257,7 +255,7 @@ const TaskListPage: React.FC = () => {
                                     Cancel
                                 </button>
                                 <button
-                                    onClick={() => handleDelete(taskToDelete.id!)}
+                                    onClick={() => handleDelete(taskToDelete.projectId!, taskToDelete.id!)}
                                     className="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
                                 >
                                     Delete

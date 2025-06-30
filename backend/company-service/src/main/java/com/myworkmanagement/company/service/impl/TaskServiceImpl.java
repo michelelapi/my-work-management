@@ -10,8 +10,11 @@ import com.myworkmanagement.company.exception.TaskBillingStatusException;
 import com.myworkmanagement.company.exception.TaskPaymentStatusException;
 import com.myworkmanagement.company.repository.ProjectRepository;
 import com.myworkmanagement.company.repository.TaskRepository;
+import com.myworkmanagement.company.service.GoogleSheetsService;
 import com.myworkmanagement.company.service.TaskService;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -19,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -29,6 +33,8 @@ public class TaskServiceImpl implements TaskService {
 
     private final TaskRepository taskRepository;
     private final ProjectRepository projectRepository;
+    private final GoogleSheetsService googleSheetsService;
+    private static final Logger logger = LoggerFactory.getLogger(TaskServiceImpl.class);
 
     @Override
     @Transactional
@@ -57,6 +63,12 @@ public class TaskServiceImpl implements TaskService {
                 .build();
 
         Task savedTask = taskRepository.save(task);
+        // Sync to Google Sheets
+        try {
+            googleSheetsService.addTaskRow(mapTaskToSheetRow(savedTask));
+        } catch (Exception e) {
+            logger.error("Failed to add task to Google Sheets: {}", e.getMessage());
+        }
         return convertToDTO(savedTask);
     }
 
@@ -88,6 +100,12 @@ public class TaskServiceImpl implements TaskService {
         task.setUserEmail(taskDTO.getUserEmail());
 
         Task updatedTask = taskRepository.save(task);
+        // Sync to Google Sheets
+        try {
+            googleSheetsService.updateTaskRowByTicketId(updatedTask.getTicketId(), mapTaskToSheetRow(updatedTask));
+        } catch (Exception e) {
+            logger.error("Failed to update task in Google Sheets: {}", e.getMessage());
+        }
         return convertToDTO(updatedTask);
     }
 
@@ -158,10 +176,19 @@ public class TaskServiceImpl implements TaskService {
     @Override
     @Transactional
     public void deleteTask(Long id) {
-        if (!taskRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Task not found with id: " + id);
-        }
+        Task task = taskRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Task not found with id: " + id));
+        String ticketId = task.getTicketId();
+        // Delete from DB first
         taskRepository.deleteById(id);
+        // Sync to Google Sheets
+        try {
+            if (ticketId != null && !ticketId.isEmpty()) {
+                googleSheetsService.deleteTaskRowByTicketId(ticketId);
+            }
+        } catch (Exception e) {
+            logger.error("Failed to delete task from Google Sheets: {}", e.getMessage());
+        }
     }
 
     // New methods for user email filtering
@@ -376,5 +403,21 @@ public class TaskServiceImpl implements TaskService {
                 .createdAt(task.getCreatedAt())
                 .updatedAt(task.getUpdatedAt())
                 .build();
+    }
+
+    private List<Object> mapTaskToSheetRow(Task task) {
+        return Arrays.asList(
+                task.getStartDate() != null ? task.getStartDate().toString() : "",
+                task.getEndDate() != null ? task.getEndDate().toString() : "",
+                task.getTicketId() != null ? task.getTicketId() : "",
+                task.getDescription() != null ? task.getDescription() : "",
+                task.getProject() != null ? task.getProject().getName() : "",
+                task.getHoursWorked() != null ? task.getHoursWorked().toString() : "",
+                task.getIsBilled() != null ? task.getIsBilled().toString() : "",
+                task.getIsPaid() != null ? task.getIsPaid().toString() : "",
+                task.getBillingDate() != null ? task.getBillingDate().toString() : "",
+                task.getPaymentDate() != null ? task.getPaymentDate().toString() : "",
+                task.getInvoiceId() != null ? task.getInvoiceId() : ""
+        );
     }
 } 

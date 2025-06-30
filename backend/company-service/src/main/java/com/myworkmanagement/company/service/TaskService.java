@@ -63,4 +63,6 @@ public interface TaskService {
      * @throws TaskPaymentStatusException if any task is not found or update fails
      */
     List<TaskDTO> updateTasksPaymentStatus(List<TaskPaymentStatusUpdateDTO> taskUpdates);
+    void putTasksOnGoogleSheets(String userEmail);
+
 } 

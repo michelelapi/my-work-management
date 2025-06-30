@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -419,5 +420,22 @@ public class TaskServiceImpl implements TaskService {
                 task.getPaymentDate() != null ? task.getPaymentDate().toString() : "",
                 task.getInvoiceId() != null ? task.getInvoiceId() : ""
         );
+    }
+
+    public void putTasksOnGoogleSheets(String userEmail) {
+        List<Task> tasks = taskRepository.findByUserEmail(userEmail);
+        tasks = tasks.stream().sorted(Comparator.comparing(Task::getStartDate).reversed()).collect(Collectors.toList());
+
+        // Sync to Google Sheets
+        try {
+            List<List<Object>> list = tasks.stream()
+            .map(this::mapTaskToSheetRow)
+            .collect(Collectors.toList());
+
+            googleSheetsService.addBulk(list);
+        } catch (Exception e) {
+            logger.error("Failed to add task to Google Sheets: {}", e.getMessage());
+        }
+
     }
 } 

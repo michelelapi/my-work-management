@@ -139,4 +139,19 @@ public class GoogleSheetsService {
         }
         throw new RuntimeException("Sheet name not found: " + SHEET_NAME);
     }
+
+    public void addBulk(List<List<Object>> listOfRowData) {
+        try {
+            
+            BatchUpdateValuesRequest batchUpdateRequest = new BatchUpdateValuesRequest();
+            batchUpdateRequest.setValueInputOption("USER_ENTERED");
+            batchUpdateRequest.setData(Collections.singletonList(
+                    new ValueRange().setRange(SHEET_NAME + "!A2:K" + (listOfRowData.size() + 1)).setValues(listOfRowData)
+            ));
+            sheetsService.spreadsheets().values().batchUpdate(SHEET_ID, batchUpdateRequest).execute();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
 } 

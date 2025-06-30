@@ -340,4 +340,21 @@ public class TaskController {
             @Valid @RequestBody List<TaskPaymentStatusUpdateDTO> taskUpdates) {
         return ResponseEntity.ok(taskService.updateTasksPaymentStatus(taskUpdates));
     }
+
+    @PutMapping("/tasks/addBulk")
+    @Operation(summary = "Put all the tasks on Google Sheets", description = "Update Google Sheets with all the tasks")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Successfully retrieved tasks"),
+        @ApiResponse(responseCode = "401", description = "Unauthorized"),
+        @ApiResponse(responseCode = "404", description = "Project not found"),
+        @ApiResponse(responseCode = "500", description = "Internal server error")
+    })
+    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    public ResponseEntity<Void> putTasksOnGoogleSheets() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String userEmail = authentication.getName();
+        taskService.putTasksOnGoogleSheets(userEmail);
+        return ResponseEntity.noContent().build();
+    }
+
 } 

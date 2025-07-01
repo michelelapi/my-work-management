@@ -357,6 +357,13 @@ public class TaskServiceImpl implements TaskService {
             task.setInvoiceId(update.getInvoiceId());
             Task savedTask = taskRepository.save(task);
             updatedTasks.add(convertToDTO(savedTask));
+
+            try {
+                googleSheetsService.updateTaskRowByTicketId(savedTask.getTicketId(), mapTaskToSheetRow(savedTask));
+            } catch (Exception e) {
+                logger.error("Failed to update task in Google Sheets: {}", e.getMessage());
+            }
+    
         }
         
         return updatedTasks;
@@ -411,7 +418,7 @@ public class TaskServiceImpl implements TaskService {
                 task.getStartDate() != null ? task.getStartDate().toString() : "",
                 task.getEndDate() != null ? task.getEndDate().toString() : "",
                 task.getTicketId() != null ? task.getTicketId() : "",
-                task.getDescription() != null ? task.getDescription() : "",
+                task.getTitle() != null ? task.getTitle() : "",
                 task.getProject() != null ? task.getProject().getName() : "",
                 task.getHoursWorked() != null ? task.getHoursWorked().toString() : "",
                 task.getIsBilled() != null ? task.getIsBilled().toString() : "",

@@ -45,6 +45,9 @@ const TaskListPage: React.FC = () => {
     // Type filter state
     const [typeFilter, setTypeFilter] = useState<string | null>(null);
 
+    // Add sort state
+    const [sortConfig, setSortConfig] = useState<{ key: keyof Task; direction: 'asc' | 'desc' }>({ key: 'startDate', direction: 'desc' });
+
     // Compute info for bill
     const taskIdsString = tasks.map(task => task.ticketId).join(', ');
     const totalAmount = tasks.reduce((sum, task) => sum + (task.hoursWorked * (task.rateUsed ?? 0)), 0);
@@ -212,6 +215,51 @@ const TaskListPage: React.FC = () => {
             console.error('Error updating payment status:', err);
         }
     };
+
+    // Sorting handler
+    const handleSort = (key: keyof Task) => {
+        setSortConfig((prev) => {
+            if (prev.key === key) {
+                // Toggle direction
+                return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
+            }
+            return { key, direction: 'asc' };
+        });
+    };
+
+    // Sort tasks before rendering
+    const sortedTasks = React.useMemo(() => {
+        const sorted = [...tasks];
+        sorted.sort((a, b) => {
+            const { key, direction } = sortConfig;
+            let aValue = a[key];
+            let bValue = b[key];
+            // Handle undefined/null
+            if (aValue == null) return 1;
+            if (bValue == null) return -1;
+            // Special handling for string, number, boolean, and date
+            if (key === 'startDate') {
+                aValue = new Date(aValue as string).getTime();
+                bValue = new Date(bValue as string).getTime();
+            }
+            if (typeof aValue === 'string' && typeof bValue === 'string') {
+                if (aValue < bValue) return direction === 'asc' ? -1 : 1;
+                if (aValue > bValue) return direction === 'asc' ? 1 : -1;
+                return 0;
+            }
+            if (typeof aValue === 'number' && typeof bValue === 'number') {
+                return direction === 'asc' ? aValue - bValue : bValue - aValue;
+            }
+            if (typeof aValue === 'boolean' && typeof bValue === 'boolean') {
+                return direction === 'asc' ? Number(aValue) - Number(bValue) : Number(bValue) - Number(aValue);
+            }
+            // Fallback
+            if (aValue < bValue) return direction === 'asc' ? -1 : 1;
+            if (aValue > bValue) return direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+        return sorted;
+    }, [tasks, sortConfig]);
 
     if (loading) {
         return (
@@ -575,18 +623,34 @@ const TaskListPage: React.FC = () => {
                     <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 table-fixed">
                         <thead className="bg-gray-50 dark:bg-gray-700">
                             <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/12">Task ID</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-5/12">Description</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-2/12">Project</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/12">Start Date</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/12">Hours</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/12">Type</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/12">Status</th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/12">Actions</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/12 cursor-pointer" onClick={() => handleSort('ticketId')}>
+                                    Task ID {sortConfig.key === 'ticketId' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-5/12 cursor-pointer" onClick={() => handleSort('description')}>
+                                    Description {sortConfig.key === 'description' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-2/12 cursor-pointer" onClick={() => handleSort('projectName')}>
+                                    Project {sortConfig.key === 'projectName' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/12 cursor-pointer" onClick={() => handleSort('startDate')}>
+                                    Start Date {sortConfig.key === 'startDate' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/12 cursor-pointer" onClick={() => handleSort('hoursWorked')}>
+                                    Hours {sortConfig.key === 'hoursWorked' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/12 cursor-pointer" onClick={() => handleSort('type')}>
+                                    Type {sortConfig.key === 'type' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/12 cursor-pointer" onClick={() => handleSort('isBilled')}>
+                                    Status {sortConfig.key === 'isBilled' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                                </th>
+                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/12">
+                                    Actions
+                                </th>
                             </tr>
                         </thead>
                         <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                            {tasks.map((task) => (
+                            {sortedTasks.map((task) => (
                                 <tr key={task.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                                     <td className="px-6 py-4 break-words w-1/12">
                                         <div className="text-sm font-medium text-gray-900 dark:text-white">{task.ticketId}</div>

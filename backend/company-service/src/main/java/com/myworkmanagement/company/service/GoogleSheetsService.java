@@ -9,12 +9,14 @@ import com.google.api.services.sheets.v4.model.*;
 import com.google.auth.http.HttpCredentialsAdapter;
 import com.google.auth.oauth2.GoogleCredentials;
 
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 public class GoogleSheetsService {
@@ -42,9 +44,8 @@ public class GoogleSheetsService {
                 .build();
     }
 
-
-
-    public void addTaskRow(List<Object> rowData) {
+    @Async
+    public CompletableFuture<Void> addTaskRow(List<Object> rowData) {
         try {
             //Insert a new empty row after the header
             InsertDimensionRequest insertRequest = new InsertDimensionRequest()
@@ -68,12 +69,16 @@ public class GoogleSheetsService {
                     .update(SHEET_ID, SHEET_NAME + "!A2:K2", updateBody)
                     .setValueInputOption("USER_ENTERED")
                     .execute();
+            return CompletableFuture.completedFuture(null);
         } catch (Exception e) {
-            throw new RuntimeException("Failed to add row to Google Sheet", e);
+            CompletableFuture<Void> future = new CompletableFuture<>();
+            future.completeExceptionally(new RuntimeException("Failed to add row to Google Sheet", e));
+            return future;
         }
     }
 
-    public void updateTaskRowByTicketId(String ticketId, List<Object> rowData) {
+    @Async
+    public CompletableFuture<Void> updateTaskRowByTicketId(String ticketId, List<Object> rowData) {
         try {
             Integer rowIndex = findRowIndexByTicketId(ticketId);
             if (rowIndex == null) {
@@ -85,12 +90,16 @@ public class GoogleSheetsService {
                     .update(SHEET_ID, range, body)
                     .setValueInputOption("USER_ENTERED")
                     .execute();
+            return CompletableFuture.completedFuture(null);
         } catch (Exception e) {
-            throw new RuntimeException("Failed to update row in Google Sheet", e);
+            CompletableFuture<Void> future = new CompletableFuture<>();
+            future.completeExceptionally(new RuntimeException("Failed to update row in Google Sheet", e));
+            return future;
         }
     }
 
-    public void deleteTaskRowByTicketId(String ticketId) {
+    @Async
+    public CompletableFuture<Void> deleteTaskRowByTicketId(String ticketId) {
         try {
             Integer rowIndex = findRowIndexByTicketId(ticketId);
             if (rowIndex == null) {
@@ -111,8 +120,11 @@ public class GoogleSheetsService {
                             )
                     );
             sheetsService.spreadsheets().batchUpdate(SHEET_ID, batchUpdateRequest).execute();
+            return CompletableFuture.completedFuture(null);
         } catch (Exception e) {
-            throw new RuntimeException("Failed to delete row in Google Sheet", e);
+            CompletableFuture<Void> future = new CompletableFuture<>();
+            future.completeExceptionally(new RuntimeException("Failed to delete row in Google Sheet", e));
+            return future;
         }
     }
 
@@ -140,17 +152,20 @@ public class GoogleSheetsService {
         throw new RuntimeException("Sheet name not found: " + SHEET_NAME);
     }
 
-    public void addBulk(List<List<Object>> listOfRowData) {
+    @Async
+    public CompletableFuture<Void> addBulk(List<List<Object>> listOfRowData) {
         try {
-            
             BatchUpdateValuesRequest batchUpdateRequest = new BatchUpdateValuesRequest();
             batchUpdateRequest.setValueInputOption("USER_ENTERED");
             batchUpdateRequest.setData(Collections.singletonList(
                     new ValueRange().setRange(SHEET_NAME + "!A2:K" + (listOfRowData.size() + 1)).setValues(listOfRowData)
             ));
             sheetsService.spreadsheets().values().batchUpdate(SHEET_ID, batchUpdateRequest).execute();
+            return CompletableFuture.completedFuture(null);
         } catch (IOException e) {
-            e.printStackTrace();
+            CompletableFuture<Void> future = new CompletableFuture<>();
+            future.completeExceptionally(e);
+            return future;
         }
     }
 

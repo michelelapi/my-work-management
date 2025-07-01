@@ -347,25 +347,27 @@ public class TaskServiceImpl implements TaskService {
     @Transactional
     public List<TaskDTO> updateTasksBillingStatus(List<TaskBillingStatusUpdateDTO> taskUpdates) {
         List<TaskDTO> updatedTasks = new ArrayList<>();
-        
+        List<String> ticketIds = new ArrayList<>();
+        List<List<Object>> rowsData = new ArrayList<>();
+
         for (TaskBillingStatusUpdateDTO update : taskUpdates) {
             Task task = taskRepository.findById(update.getTaskId())
                 .orElseThrow(() -> new TaskBillingStatusException("Task not found with id: " + update.getTaskId()));
             
             task.setIsBilled(update.getIsBilled());
-            task.setBillingDate(update.getBillingDate());
-            task.setInvoiceId(update.getInvoiceId());
+            task.setBillingDate(update.getIsBilled()?update.getBillingDate():null);
+            task.setInvoiceId(update.getIsBilled()?update.getInvoiceId():null);
             Task savedTask = taskRepository.save(task);
             updatedTasks.add(convertToDTO(savedTask));
 
-            try {
-                googleSheetsService.updateTaskRowByTicketId(savedTask.getTicketId(), mapTaskToSheetRow(savedTask));
-            } catch (Exception e) {
-                logger.error("Failed to update task in Google Sheets: {}", e.getMessage());
-            }
-    
+            googleSheetsService.updateTaskRowByTicketId(savedTask.getTicketId(), mapTaskToSheetRow(savedTask))
+            .exceptionally(ex -> {
+                logger.error("Failed to update task in Google Sheets: {}", ex.getMessage());
+                return null;
+            });
         }
-        
+
+
         return updatedTasks;
     }
 
@@ -379,9 +381,15 @@ public class TaskServiceImpl implements TaskService {
                 .orElseThrow(() -> new TaskPaymentStatusException("Task not found with id: " + update.getTaskId()));
             
             task.setIsPaid(update.getIsPaid());
-            task.setPaymentDate(update.getPaymentDate());
+            task.setPaymentDate(update.getIsPaid()?update.getPaymentDate():null);
             Task savedTask = taskRepository.save(task);
             updatedTasks.add(convertToDTO(savedTask));
+
+            googleSheetsService.updateTaskRowByTicketId(savedTask.getTicketId(), mapTaskToSheetRow(savedTask))
+            .exceptionally(ex -> {
+                logger.error("Failed to update task in Google Sheets: {}", ex.getMessage());
+                return null;
+            });
         }
         
         return updatedTasks;

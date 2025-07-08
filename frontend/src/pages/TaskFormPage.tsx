@@ -49,7 +49,13 @@ const TaskFormPage: React.FC = () => {
                     const fetchedTask = await taskService.getTask(parseInt(taskId));
                     setTask(fetchedTask);
                 } else if (urlProjectId) {
-                    setTask(prev => ({ ...prev, projectId: parseInt(urlProjectId) }));
+                    const projectIdNum = parseInt(urlProjectId);
+                    const foundProject = fetchedProjects.find(p => p.id === projectIdNum);
+                    setTask(prev => ({
+                        ...prev,
+                        projectId: projectIdNum,
+                        rateUsed: foundProject?.hourlyRate
+                    }));
                 }
             } catch (err) {
                 console.error('Error fetching data for task form:', err);
@@ -96,10 +102,21 @@ const TaskFormPage: React.FC = () => {
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value, type } = e.target;
-        setTask(prev => ({
-            ...prev,
-            [name]: type === 'number' ? parseFloat(value) : value
-        }));
+        if (name === 'projectId') {
+            const projectIdNum = parseInt(value);
+            const foundProject = projects.find(p => p.id === projectIdNum);
+            setTask(prev => ({
+                ...prev,
+                projectId: projectIdNum,
+                // Only set rateUsed if the user hasn't already set it or if it's empty
+                rateUsed: foundProject?.hourlyRate
+            }));
+        } else {
+            setTask(prev => ({
+                ...prev,
+                [name]: type === 'number' ? parseFloat(value) : value
+            }));
+        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {

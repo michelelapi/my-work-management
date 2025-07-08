@@ -108,7 +108,7 @@ const TaskFormPage: React.FC = () => {
             setTask(prev => ({
                 ...prev,
                 projectId: projectIdNum,
-                // Only set rateUsed if the user hasn't already set it or if it's empty
+                // Only set rateUsed if the user hasn't already set it or if it's empty-
                 rateUsed: foundProject?.hourlyRate
             }));
         } else {

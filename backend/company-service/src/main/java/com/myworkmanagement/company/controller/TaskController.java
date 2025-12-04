@@ -3,10 +3,10 @@ package com.myworkmanagement.company.controller;
 import com.myworkmanagement.company.dto.TaskDTO;
 import com.myworkmanagement.company.dto.TaskBillingStatusUpdateDTO;
 import com.myworkmanagement.company.dto.TaskPaymentStatusUpdateDTO;
+import com.myworkmanagement.company.service.SalPdfService;
 import com.myworkmanagement.company.service.TaskService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -14,10 +14,13 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -26,8 +29,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
 
+@Slf4j
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
@@ -36,6 +39,7 @@ import java.util.Map;
 public class TaskController {
 
     private final TaskService taskService;
+    private final SalPdfService salPdfService;
 
     @PostMapping("/projects/{projectId}/tasks")
     @Operation(summary = "Create new task", description = "Creates a new task for a project")
@@ -99,10 +103,14 @@ public class TaskController {
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
     public ResponseEntity<Page<TaskDTO>> getAllTasks(
             @Parameter(description = "Pagination parameters (page, size, sort)", required = false) Pageable pageable,
-            @Parameter(description = "Search term to filter tasks by title, description, or ticket ID", required = false) @RequestParam(required = false) String search) {
+            @Parameter(description = "Search term to filter tasks by title, description, or ticket ID", required = false) @RequestParam(required = false) String search,
+            @Parameter(description = "Filter by project ID", required = false) @RequestParam(required = false) Long projectId,
+            @Parameter(description = "Filter by billing status (true=billed, false=unbilled)", required = false) @RequestParam(required = false) Boolean isBilled,
+            @Parameter(description = "Filter by payment status (true=paid, false=unpaid)", required = false) @RequestParam(required = false) Boolean isPaid,
+            @Parameter(description = "Filter by task type (EVOLUTIVA, CORRETTIVA)", required = false) @RequestParam(required = false) String type) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String userEmail = authentication.getName();
-        return ResponseEntity.ok(taskService.getTasksByUserEmail(userEmail, pageable, search));
+        return ResponseEntity.ok(taskService.getTasksByUserEmail(userEmail, pageable, search, projectId, isBilled, isPaid, type));
     }
 
     @GetMapping("/projects/{projectId}/tasks")
@@ -117,8 +125,13 @@ public class TaskController {
     public ResponseEntity<Page<TaskDTO>> getTasksByProject(
             @Parameter(description = "Unique identifier of the project", required = true, example = "1") @PathVariable Long projectId,
             @Parameter(description = "Pagination parameters (page, size, sort)", required = false) Pageable pageable,
-            @Parameter(description = "Search term to filter tasks by title, description, or ticket ID", required = false) @RequestParam(required = false) String search) {
-        return ResponseEntity.ok(taskService.getTasksByProject(projectId, pageable, search));
+            @Parameter(description = "Search term to filter tasks by title, description, or ticket ID", required = false) @RequestParam(required = false) String search,
+            @Parameter(description = "Filter by billing status (true=billed, false=unbilled)", required = false) @RequestParam(required = false) Boolean isBilled,
+            @Parameter(description = "Filter by payment status (true=paid, false=unpaid)", required = false) @RequestParam(required = false) Boolean isPaid,
+            @Parameter(description = "Filter by task type (EVOLUTIVA, CORRETTIVA)", required = false) @RequestParam(required = false) String type) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String userEmail = authentication.getName();
+        return ResponseEntity.ok(taskService.getTasksByProject(projectId, pageable, search, isBilled, isPaid, userEmail, type));
     }
 
     @GetMapping("/projects/{projectId}/tasks/date-range")
@@ -318,7 +331,7 @@ public class TaskController {
         @ApiResponse(responseCode = "404", description = "One or more tasks not found"),
         @ApiResponse(responseCode = "500", description = "Internal server error")
     })
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN','USER')")
     public ResponseEntity<List<TaskDTO>> updateTasksBillingStatus(
             @Parameter(description = "List of task IDs and their billing status", required = true)
             @Valid @RequestBody List<TaskBillingStatusUpdateDTO> taskUpdates) {
@@ -334,7 +347,7 @@ public class TaskController {
         @ApiResponse(responseCode = "404", description = "One or more tasks not found"),
         @ApiResponse(responseCode = "500", description = "Internal server error")
     })
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN','USER')")
     public ResponseEntity<List<TaskDTO>> updateTasksPaymentStatus(
             @Parameter(description = "List of task IDs and their payment status", required = true)
             @Valid @RequestBody List<TaskPaymentStatusUpdateDTO> taskUpdates) {
@@ -355,6 +368,82 @@ public class TaskController {
         String userEmail = authentication.getName();
         taskService.putTasksOnGoogleSheets(userEmail);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/tasks/sal/pdf")
+    @Operation(summary = "Generate SAL PDF for Dedagroup", description = "Generates a formal SAL PDF document for the specified month/year")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "PDF generated successfully"),
+        @ApiResponse(responseCode = "401", description = "Unauthorized"),
+        @ApiResponse(responseCode = "500", description = "Internal server error")
+    })
+    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    public ResponseEntity<byte[]> generateSalPdf(
+            @Parameter(description = "Year for the report", required = true, example = "2025") @RequestParam Integer year,
+            @Parameter(description = "Month for the report (1-12)", required = true, example = "11") @RequestParam Integer month,
+            @Parameter(description = "Project ID to filter tasks (optional)", required = false) @RequestParam(required = false) Long projectId,
+            @Parameter(description = "User name for the document", required = false) @RequestParam(required = false) String userName,
+            @Parameter(description = "User address for the document", required = false) @RequestParam(required = false) String userAddress,
+            @Parameter(description = "User phone for the document", required = false) @RequestParam(required = false) String userPhone,
+            @Parameter(description = "User email for the document", required = false) @RequestParam(required = false) String userEmailAddress,
+            @Parameter(description = "Project name for the document", required = false) @RequestParam(required = false) String projectName) {
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String userEmail = authentication.getName();
+            
+            // Calculate date range for the month
+            LocalDate startDate = LocalDate.of(year, month, 1);
+            LocalDate endDate = startDate.withDayOfMonth(startDate.lengthOfMonth());
+            LocalDate reportMonth = startDate;
+            
+            // Fetch tasks for the month
+            List<TaskDTO> tasks;
+            if (projectId != null) {
+                // Get tasks for specific project in date range
+                tasks = taskService.getTasksByProjectAndDateRange(projectId, startDate, endDate, 
+                    org.springframework.data.domain.PageRequest.of(0, Integer.MAX_VALUE)).getContent();
+            } else {
+                // Get all tasks for user in the date range
+                Page<TaskDTO> allUserTasks = taskService.getTasksByUserEmail(userEmail, 
+                    org.springframework.data.domain.PageRequest.of(0, Integer.MAX_VALUE), null);
+                tasks = allUserTasks.getContent()
+                    .stream()
+                    .filter(t -> {
+                        if (t.getStartDate() == null) return false;
+                        LocalDate taskDate = t.getStartDate();
+                        return !taskDate.isBefore(startDate) && !taskDate.isAfter(endDate);
+                    })
+                    .collect(java.util.stream.Collectors.toList());
+            }
+            
+            if (tasks.isEmpty()) {
+                return ResponseEntity.badRequest().build();
+            }
+            
+            // Use defaults if not provided
+            if (userName == null || userName.isEmpty()) {
+                userName = userEmail.split("@")[0]; // Use email prefix as default
+            }
+            if (userEmailAddress == null || userEmailAddress.isEmpty()) {
+                userEmailAddress = userEmail;
+            }
+            
+            // Generate PDF
+            byte[] pdfBytes = salPdfService.generateSalPdf(tasks, userEmail, userName, 
+                userAddress, userPhone, userEmailAddress, projectName, reportMonth);
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_PDF);
+            headers.setContentDispositionFormData("attachment", 
+                String.format("SAL_%d_%02d.pdf", year, month));
+            
+            return ResponseEntity.ok()
+                .headers(headers)
+                .body(pdfBytes);
+        } catch (Exception e) {
+            log.error("Error generating SAL PDF", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 
 } 

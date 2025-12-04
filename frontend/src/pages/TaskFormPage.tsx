@@ -25,7 +25,8 @@ const TaskFormPage: React.FC = () => {
         startDate: new Date().toISOString().split('T')[0],
         hoursWorked: 0,
         isBilled: false,
-        isPaid: false
+        isPaid: false,
+        referencedTaskId: ''
     });
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
@@ -129,8 +130,23 @@ const TaskFormPage: React.FC = () => {
         setShowConfirmModal(true);
     };
 
+    const generateRandomTaskId = (): string => {
+        const year = new Date().getFullYear();
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let randomPart = '';
+        for (let i = 0; i < 6; i++) {
+            randomPart += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return `TSK-${year}-${randomPart}`;
+    };
+
     const handleConfirmSave = async () => {
         try {
+            // Generate random task ID if creating new task and ticketId is empty
+            if (!taskId && (!task.ticketId || task.ticketId.trim() === '')) {
+                task.ticketId = generateRandomTaskId();
+            }
+
             if (taskId) {
                 // Update existing task
                 if (task.projectId) {
@@ -275,6 +291,22 @@ const TaskFormPage: React.FC = () => {
                         name="ticketId"
                         id="ticketId"
                         value={task.ticketId || ''}
+                        onChange={handleChange}
+                        placeholder={isEditMode ? '' : 'Will be auto-generated if left empty'}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:border-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
+                    />
+                </div>
+
+                {/* Referenced Task ID */}
+                <div>
+                    <label htmlFor="referencedTaskId" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Referenced Task ID
+                    </label>
+                    <input
+                        type="text"
+                        name="referencedTaskId"
+                        id="referencedTaskId"
+                        value={task.referencedTaskId || ''}
                         onChange={handleChange}
                         className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:border-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
                     />

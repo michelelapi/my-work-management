@@ -2,10 +2,13 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Task } from '../types/task';
 import { taskService, PageResponse } from '../services/taskService';
+import projectService from '../services/projectService';
+import { Project } from '../types/project';
 // import { FaPen, FaTrash } from 'react-icons/fa';
 import { FaPen } from "@react-icons/all-files/fa/FaPen"
 import { FaTrash } from "@react-icons/all-files/fa/FaTrash"
 import { FaCheck } from "@react-icons/all-files/fa/FaCheck"
+import { FaFilePdf } from "@react-icons/all-files/fa/FaFilePdf"
 
 const TaskListPage: React.FC = () => {
     const { projectId } = useParams<{ projectId: string }>();
@@ -38,6 +41,11 @@ const TaskListPage: React.FC = () => {
     const [selectedPaymentStatus, setSelectedPaymentStatus] = useState<boolean | null>(null);
     const [paymentDate, setPaymentDate] = useState<string>(new Date().toISOString().split('T')[0]);
 
+    // Invoice ID modal state for single task billing
+    const [invoiceIdModalOpen, setInvoiceIdModalOpen] = useState(false);
+    const [taskToBill, setTaskToBill] = useState<Task | null>(null);
+    const [invoiceIdInput, setInvoiceIdInput] = useState<string>('');
+
     // Info For Bill modal state
     const [infoForBillModalOpen, setInfoForBillModalOpen] = useState(false);
     const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -45,18 +53,54 @@ const TaskListPage: React.FC = () => {
     // Type filter state
     const [typeFilter, setTypeFilter] = useState<string | null>(null);
 
-    // Add sort state
-    const [sortConfig, setSortConfig] = useState<{ key: keyof Task; direction: 'asc' | 'desc' }>({ key: 'startDate', direction: 'desc' });
+    // Project filter state
+    const [projectFilter, setProjectFilter] = useState<number | null>(null);
+    const [projects, setProjects] = useState<Project[]>([]);
 
-    // Compute info for bill
-    const taskIdsString = tasks.map(task => task.ticketId).join(', ');
+    // Status filter state
+    const [statusFilter, setStatusFilter] = useState<string>('all'); // 'all', 'billed', 'unbilled', 'paid', 'unpaid'
+
+    // Sort state - now using backend sorting
+    const [sortField, setSortField] = useState<string>('startDate');
+    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+
+    // SAL generation modal state
+    const [salModalOpen, setSalModalOpen] = useState(false);
+    const [salYear, setSalYear] = useState<number>(new Date().getFullYear());
+    const [salMonth, setSalMonth] = useState<number>(new Date().getMonth() + 1);
+
+    // Compute info for bill - group tasks by day
+    const tasksByDay: Record<string, Task[]> = tasks.reduce((acc, task) => {
+        const date = task.startDate ? new Date(task.startDate).toLocaleDateString() : 'No Date';
+        if (!acc[date]) {
+            acc[date] = [];
+        }
+        acc[date].push(task);
+        return acc;
+    }, {} as Record<string, Task[]>);
+
+    const taskIdsString = tasks.map(task => task.ticketId).filter(id => id).join(', ');
     const totalAmount = tasks.reduce((sum, task) => sum + (task.hoursWorked * (task.rateUsed ?? 0)), 0);
+    const totalHours = tasks.reduce((sum, task) => sum + (task.hoursWorked || 0), 0);
 
     const handleCopy = (value: string, field: string) => {
         navigator.clipboard.writeText(value);
         setCopiedField(field);
         setTimeout(() => setCopiedField(null), 1000);
     };
+
+    // Fetch projects for filter
+    useEffect(() => {
+        const fetchProjects = async () => {
+            try {
+                const fetchedProjects = await projectService.getAllProjectsForUser();
+                setProjects(fetchedProjects);
+            } catch (err) {
+                console.error('Error fetching projects:', err);
+            }
+        };
+        fetchProjects();
+    }, []);
 
     // Debounce search term
     useEffect(() => {
@@ -71,17 +115,57 @@ const TaskListPage: React.FC = () => {
         const fetchTasks = async () => { 
             try {
                 setLoading(true);
-                const response = await taskService.getTasks(
-                    projectId ? parseInt(projectId) : undefined,
+                
+                // Determine project filter (URL param takes precedence)
+                // Handle projectFilter: if it's a number (including 0), use it; if null/undefined, use undefined
+                const effectiveProjectId: number | undefined = projectId 
+                    ? parseInt(projectId) 
+                    : (projectFilter !== null && projectFilter !== undefined) 
+                        ? projectFilter 
+                        : undefined;
+                
+                // Debug logging
+                console.log('Fetch tasks - projectFilter:', projectFilter, 'projectId:', projectId, 'effectiveProjectId:', effectiveProjectId, 'type of projectFilter:', typeof projectFilter);
+                
+                // Determine status filters
+                let isBilled: boolean | undefined = undefined;
+                let isPaid: boolean | undefined = undefined;
+                if (statusFilter === 'billed') {
+                    isBilled = true;
+                } else if (statusFilter === 'unbilled') {
+                    isBilled = false;
+                } else if (statusFilter === 'paid') {
+                    isPaid = true;
+                } else if (statusFilter === 'unpaid') {
+                    isPaid = false;
+                }
+                
+                // Build sort parameter
+                const sortParam = `${sortField},${sortDirection}`;
+                
+                console.log('Calling getTasks with:', {
+                    effectiveProjectId,
                     currentPage,
                     pageSize,
-                    debouncedSearchTerm // Use debounced search term
+                    debouncedSearchTerm,
+                    isBilled,
+                    isPaid,
+                    sortParam,
+                    typeFilter
+                });
+                
+                const response = await taskService.getTasks(
+                    effectiveProjectId,
+                    currentPage,
+                    pageSize,
+                    debouncedSearchTerm,
+                    isBilled,
+                    isPaid,
+                    sortParam,
+                    typeFilter || undefined
                 );
-                let filteredTasks = response.content;
-                if (typeFilter) {
-                    filteredTasks = filteredTasks.filter(task => task.type === typeFilter);
-                }
-                setTasks(filteredTasks);
+                
+                setTasks(response.content);
                 setTotalPages(response.totalPages);
                 setTotalElements(response.totalElements);
         
@@ -95,7 +179,7 @@ const TaskListPage: React.FC = () => {
 
         fetchTasks();
 
-    }, [projectId, currentPage, pageSize, debouncedSearchTerm, typeFilter]); // Add typeFilter to dependencies
+    }, [projectId, projectFilter, currentPage, pageSize, debouncedSearchTerm, typeFilter, statusFilter, sortField, sortDirection]);
 
     useEffect(() => {
         if (searchTermRef.current && !loading) {
@@ -216,50 +300,219 @@ const TaskListPage: React.FC = () => {
         }
     };
 
-    // Sorting handler
-    const handleSort = (key: keyof Task) => {
-        setSortConfig((prev) => {
-            if (prev.key === key) {
-                // Toggle direction
-                return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
-            }
-            return { key, direction: 'asc' };
-        });
+    const handleToggleBillingStatus = async (task: Task) => {
+        if (!task.id) return;
+
+        const newBillingStatus = !task.isBilled;
+
+        // If unbilling, proceed directly without modal
+        if (!newBillingStatus) {
+            await performBillingStatusUpdate(task, false, '', new Date().toISOString().split('T')[0]);
+            return;
+        }
+
+        // If billing, check localStorage first
+        if (!task.projectId) {
+            // If no projectId, show modal
+            setTaskToBill(task);
+            setInvoiceIdInput(task.invoiceId || '');
+            setInvoiceIdModalOpen(true);
+            return;
+        }
+
+        const taskDate = new Date(task.startDate);
+        const monthYear = `${taskDate.getFullYear()}-${String(taskDate.getMonth() + 1).padStart(2, '0')}`;
+        const storageKey = `invoiceId_${monthYear}_${task.projectId}`;
+        const storedInvoiceId = localStorage.getItem(storageKey);
+
+        if (storedInvoiceId) {
+            // Use stored invoiceId without showing modal
+            await performBillingStatusUpdate(task, true, storedInvoiceId, new Date().toISOString().split('T')[0]);
+        } else {
+            // Show modal to enter invoiceId
+            setTaskToBill(task);
+            setInvoiceIdInput(task.invoiceId || '');
+            setInvoiceIdModalOpen(true);
+        }
     };
 
-    // Sort tasks before rendering
-    const sortedTasks = React.useMemo(() => {
-        const sorted = [...tasks];
-        sorted.sort((a, b) => {
-            const { key, direction } = sortConfig;
-            let aValue = a[key];
-            let bValue = b[key];
-            // Handle undefined/null
-            if (aValue == null) return 1;
-            if (bValue == null) return -1;
-            // Special handling for string, number, boolean, and date
-            if (key === 'startDate') {
-                aValue = new Date(aValue as string).getTime();
-                bValue = new Date(bValue as string).getTime();
+    const performBillingStatusUpdate = async (task: Task, isBilled: boolean, invoiceId: string, billingDate: string) => {
+        if (!task.id) return;
+
+        try {
+            // Always send a valid date - backend will ignore it if isBilled is false
+            const billingDateToSend = isBilled 
+                ? billingDate
+                : (task.billingDate || new Date().toISOString().split('T')[0]);
+            
+            const taskUpdate = [{
+                taskId: task.id,
+                isBilled: isBilled,
+                billingDate: billingDateToSend,
+                invoiceId: isBilled ? invoiceId : ''
+            }];
+
+            await taskService.updateTasksBillingStatus(taskUpdate);
+            
+            // If billing, store invoiceId in localStorage
+            if (isBilled && invoiceId && task.projectId) {
+                const taskDate = new Date(task.startDate);
+                const monthYear = `${taskDate.getFullYear()}-${String(taskDate.getMonth() + 1).padStart(2, '0')}`;
+                const storageKey = `invoiceId_${monthYear}_${task.projectId}`;
+                localStorage.setItem(storageKey, invoiceId);
             }
-            if (typeof aValue === 'string' && typeof bValue === 'string') {
-                if (aValue < bValue) return direction === 'asc' ? -1 : 1;
-                if (aValue > bValue) return direction === 'asc' ? 1 : -1;
-                return 0;
+            
+            // Refresh the task list
+            const effectiveProjectId: number | undefined = projectId 
+                ? parseInt(projectId) 
+                : (projectFilter !== null && projectFilter !== undefined) 
+                    ? projectFilter 
+                    : undefined;
+            
+            let isBilledFilter: boolean | undefined = undefined;
+            let isPaid: boolean | undefined = undefined;
+            if (statusFilter === 'billed') {
+                isBilledFilter = true;
+            } else if (statusFilter === 'unbilled') {
+                isBilledFilter = false;
+            } else if (statusFilter === 'paid') {
+                isPaid = true;
+            } else if (statusFilter === 'unpaid') {
+                isPaid = false;
             }
-            if (typeof aValue === 'number' && typeof bValue === 'number') {
-                return direction === 'asc' ? aValue - bValue : bValue - aValue;
+            
+            const sortParam = `${sortField},${sortDirection}`;
+            
+            const response = await taskService.getTasks(
+                effectiveProjectId,
+                currentPage,
+                pageSize,
+                debouncedSearchTerm,
+                isBilledFilter,
+                isPaid,
+                sortParam,
+                typeFilter || undefined
+            );
+            setTasks(response.content);
+            setTotalPages(response.totalPages);
+            setTotalElements(response.totalElements);
+        } catch (err) {
+            setError('Failed to update billing status. Please try again later.');
+            console.error('Error updating billing status:', err);
+        }
+    };
+
+    const handleInvoiceIdSubmit = async () => {
+        if (!taskToBill || !invoiceIdInput.trim()) {
+            setError('Please enter an invoice ID');
+            return;
+        }
+
+        setInvoiceIdModalOpen(false);
+        await performBillingStatusUpdate(
+            taskToBill, 
+            true, 
+            invoiceIdInput.trim(), 
+            new Date().toISOString().split('T')[0]
+        );
+        setTaskToBill(null);
+        setInvoiceIdInput('');
+    };
+
+    const handleTogglePaymentStatus = async (task: Task) => {
+        if (!task.id) return;
+
+        try {
+            const newPaymentStatus = !task.isPaid;
+            // Always send a valid date - backend will ignore it if isPaid is false
+            const paymentDateToSend = newPaymentStatus 
+                ? new Date().toISOString().split('T')[0] 
+                : (task.paymentDate || new Date().toISOString().split('T')[0]);
+            const taskUpdate = [{
+                taskId: task.id,
+                isPaid: newPaymentStatus,
+                paymentDate: paymentDateToSend
+            }];
+
+            await taskService.updateTasksPaymentStatus(taskUpdate);
+            
+            // Refresh the task list
+            const effectiveProjectId: number | undefined = projectId 
+                ? parseInt(projectId) 
+                : (projectFilter !== null && projectFilter !== undefined) 
+                    ? projectFilter 
+                    : undefined;
+            
+            let isBilled: boolean | undefined = undefined;
+            let isPaid: boolean | undefined = undefined;
+            if (statusFilter === 'billed') {
+                isBilled = true;
+            } else if (statusFilter === 'unbilled') {
+                isBilled = false;
+            } else if (statusFilter === 'paid') {
+                isPaid = true;
+            } else if (statusFilter === 'unpaid') {
+                isPaid = false;
             }
-            if (typeof aValue === 'boolean' && typeof bValue === 'boolean') {
-                return direction === 'asc' ? Number(aValue) - Number(bValue) : Number(bValue) - Number(aValue);
-            }
-            // Fallback
-            if (aValue < bValue) return direction === 'asc' ? -1 : 1;
-            if (aValue > bValue) return direction === 'asc' ? 1 : -1;
-            return 0;
-        });
-        return sorted;
-    }, [tasks, sortConfig]);
+            
+            const sortParam = `${sortField},${sortDirection}`;
+            
+            const response = await taskService.getTasks(
+                effectiveProjectId,
+                currentPage,
+                pageSize,
+                debouncedSearchTerm,
+                isBilled,
+                isPaid,
+                sortParam,
+                typeFilter || undefined
+            );
+            setTasks(response.content);
+            setTotalPages(response.totalPages);
+            setTotalElements(response.totalElements);
+        } catch (err) {
+            setError('Failed to update payment status. Please try again later.');
+            console.error('Error updating payment status:', err);
+        }
+    };
+
+    // Sorting handler - now triggers backend sorting
+    const handleSort = (field: string) => {
+        if (sortField === field) {
+            // Toggle direction
+            setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortField(field);
+            setSortDirection('asc');
+        }
+        setCurrentPage(0); // Reset to first page when sorting changes
+    };
+
+    // Handle SAL PDF generation
+    const handleGenerateSal = async () => {
+        try {
+            const blob = await taskService.generateSalPdf(
+                salYear,
+                salMonth,
+                projectFilter || (projectId ? parseInt(projectId) : undefined)
+            );
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `SAL_${salYear}_${String(salMonth).padStart(2, '0')}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            setSalModalOpen(false);
+        } catch (err) {
+            setError('Failed to generate SAL PDF. Please try again later.');
+            console.error('Error generating SAL PDF:', err);
+        }
+    };
+
+    // Use tasks directly (already sorted by backend)
+    const sortedTasks = tasks;
 
     if (loading) {
         return (
@@ -314,6 +567,65 @@ const TaskListPage: React.FC = () => {
                 </div>
             )}
 
+            {/* Invoice ID Modal for Single Task Billing */}
+            {invoiceIdModalOpen && taskToBill && (
+                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
+                    <div className="relative p-5 border w-96 shadow-lg rounded-md bg-white dark:bg-gray-800">
+                        <div className="mt-3 text-center">
+                            <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 dark:bg-green-900">
+                                <FaCheck className="h-6 w-6 text-green-600 dark:text-green-200" />
+                            </div>
+                            <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white mt-2">
+                                Enter Invoice ID
+                            </h3>
+                            <div className="mt-2 px-7 py-3">
+                                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                                    Please enter the invoice ID for task #{taskToBill.ticketId || taskToBill.id}
+                                </p>
+                                <div className="flex flex-col items-center space-y-2">
+                                    <label htmlFor="invoiceIdInput" className="text-sm text-gray-600 dark:text-gray-400">
+                                        Invoice ID
+                                    </label>
+                                    <input
+                                        type="text"
+                                        id="invoiceIdInput"
+                                        value={invoiceIdInput}
+                                        onChange={(e) => setInvoiceIdInput(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                handleInvoiceIdSubmit();
+                                            }
+                                        }}
+                                        placeholder="Enter invoice ID"
+                                        className="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white w-full"
+                                        autoFocus
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex justify-center space-x-4 mt-4">
+                                <button
+                                    onClick={() => {
+                                        setInvoiceIdModalOpen(false);
+                                        setTaskToBill(null);
+                                        setInvoiceIdInput('');
+                                    }}
+                                    className="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleInvoiceIdSubmit}
+                                    disabled={!invoiceIdInput.trim()}
+                                    className="px-4 py-2 bg-green-600 text-white text-base font-medium rounded-md shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+                                >
+                                    Submit
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
                     {projectId ? 'Project Tasks' : 'All Tasks'}
@@ -338,6 +650,13 @@ const TaskListPage: React.FC = () => {
                         className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-md transition-colors flex items-center"
                     >
                         Info For Bill
+                    </button>
+                    <button
+                        onClick={() => setSalModalOpen(true)}
+                        className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-md transition-colors flex items-center"
+                    >
+                        <FaFilePdf className="mr-2" />
+                        Generate SAL for Dedagroup
                     </button>
                     <button
                         onClick={() => navigate('/tasks/new')}
@@ -517,12 +836,47 @@ const TaskListPage: React.FC = () => {
             {/* Info For Bill Modal */}
             {infoForBillModalOpen && (
                 <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
-                    <div className="relative p-5 border w-96 shadow-lg rounded-md bg-white dark:bg-gray-800">
-                        <div className="mt-3 text-center">
-                            <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white mt-2 mb-4">
+                    <div className="relative p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white dark:bg-gray-800 max-h-[90vh] overflow-y-auto">
+                        <div className="mt-3">
+                            <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white mt-2 mb-4 text-center">
                                 Info For Bill
                             </h3>
+                            
+                            {/* Tasks grouped by day */}
+                            <div className="mb-4">
+                                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Tasks by Day (for Interlem Timesheet)</h4>
+                                <div className="space-y-3 max-h-64 overflow-y-auto">
+                                    {Object.entries(tasksByDay).map(([date, dayTasks]) => (
+                                        <div key={date} className="border-b border-gray-200 dark:border-gray-700 pb-2">
+                                            <div className="font-medium text-sm text-gray-800 dark:text-gray-200 mb-1">{date}</div>
+                                            {dayTasks.map((task, idx) => (
+                                                <div key={idx} className="text-xs text-gray-600 dark:text-gray-400 ml-4">
+                                                    • {task.title || task.description || 'No title'} - {task.hoursWorked}h {task.ticketId ? `(${task.ticketId})` : ''}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
                             <div className="flex flex-col items-start space-y-4">
+                                <div className="w-full">
+                                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Total Hours</label>
+                                    <div className="flex items-center space-x-2">
+                                        <input
+                                            type="text"
+                                            readOnly
+                                            value={totalHours.toFixed(2)}
+                                            className="flex-1 px-2 py-1 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white text-xs"
+                                        />
+                                        <button
+                                            onClick={() => handleCopy(totalHours.toFixed(2), 'hours')}
+                                            className="px-2 py-1 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 text-xs"
+                                        >
+                                            {copiedField === 'hours' ? 'Copied!' : 'Copy'}
+                                        </button>
+                                    </div>
+                                </div>
                                 <div className="w-full">
                                     <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Task IDs</label>
                                     <div className="flex items-center space-x-2">
@@ -571,46 +925,148 @@ const TaskListPage: React.FC = () => {
                 </div>
             )}
 
-            {/* Filter and Page Size Controls */}
-            <div className="flex flex-col md:flex-row justify-between items-center mb-4 space-y-4 md:space-y-0 md:space-x-4">
-                <div className="flex items-center w-full md:w-1/3">
-                    <input
-                        type="text"
-                        placeholder="Search tasks..."
-                        ref={searchTermRef}
-                        value={searchTerm}
-                        onChange={handleSearchChange}
-                        className="flex-1 p-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                    />
-                    <div className="flex items-center ml-4">
-                        <label className="text-gray-700 dark:text-gray-300 text-sm mr-2">Evolutiva</label>
-                        <input
-                            type="checkbox"
-                            checked={typeFilter === 'EVOLUTIVA'}
-                            onChange={e => setTypeFilter(e.target.checked ? 'EVOLUTIVA' : null)}
-                            className="mr-2"
-                        />
-                        <label className="text-gray-700 dark:text-gray-300 text-sm mr-2">Correttiva</label>
-                        <input
-                            type="checkbox"
-                            checked={typeFilter === 'CORRETTIVA'}
-                            onChange={e => setTypeFilter(e.target.checked ? 'CORRETTIVA' : null)}
-                        />
+            {/* SAL Generation Modal */}
+            {salModalOpen && (
+                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
+                    <div className="relative p-5 border w-96 shadow-lg rounded-md bg-white dark:bg-gray-800">
+                        <div className="mt-3 text-center">
+                            <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white mt-2 mb-4">
+                                Generate SAL for Dedagroup
+                            </h3>
+                            <div className="flex flex-col space-y-4">
+                                <div>
+                                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Year</label>
+                                    <input
+                                        type="number"
+                                        value={salYear}
+                                        onChange={(e) => setSalYear(parseInt(e.target.value))}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                        min="2020"
+                                        max="2100"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Month</label>
+                                    <select
+                                        value={salMonth}
+                                        onChange={(e) => setSalMonth(parseInt(e.target.value))}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                    >
+                                        {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
+                                            <option key={month} value={month}>
+                                                {new Date(2000, month - 1, 1).toLocaleString('default', { month: 'long' })}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="flex justify-center space-x-4 mt-6">
+                                <button
+                                    onClick={() => setSalModalOpen(false)}
+                                    className="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleGenerateSal}
+                                    className="px-4 py-2 bg-purple-600 text-white text-base font-medium rounded-md shadow-sm hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                >
+                                    Generate PDF
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                    <label htmlFor="pageSizeSelect" className="text-gray-700 dark:text-gray-300">Items per page:</label>
-                    <select
-                        id="pageSizeSelect"
-                        value={pageSize}
-                        onChange={handlePageSizeChange}
-                        className="p-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                    >
-                        <option value="5">5</option>
-                        <option value="10">10</option>
-                        <option value="20">20</option>
-                        <option value="50">50</option>
-                    </select>
+            )}
+
+            {/* Filter and Page Size Controls */}
+            <div className="flex flex-col space-y-4 mb-4">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0 md:space-x-4">
+                    <div className="flex flex-wrap items-center gap-4 w-full md:w-2/3">
+                        <input
+                            type="text"
+                            placeholder="Search tasks..."
+                            ref={searchTermRef}
+                            value={searchTerm}
+                            onChange={handleSearchChange}
+                            className="flex-1 min-w-[200px] p-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                        />
+                        {!projectId && (
+                            <select
+                                value={projectFilter !== null ? projectFilter : ''}
+                                onChange={(e) => {
+                                    const value = e.target.value;
+                                    console.log('Project dropdown changed - value:', value, 'type:', typeof value);
+                                    if (value && value !== '') {
+                                        const parsedValue = parseInt(value, 10);
+                                        console.log('Setting projectFilter to:', parsedValue);
+                                        setProjectFilter(isNaN(parsedValue) ? null : parsedValue);
+                                    } else {
+                                        console.log('Setting projectFilter to null');
+                                        setProjectFilter(null);
+                                    }
+                                    setCurrentPage(0);
+                                }}
+                                className="p-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                            >
+                                <option value="">All Projects</option>
+                                {projects.map(project => (
+                                    <option key={project.id} value={String(project.id)}>
+                                        {project.name}
+                                    </option>
+                                ))}
+                            </select>
+                        )}
+                        <select
+                            value={statusFilter}
+                            onChange={(e) => {
+                                setStatusFilter(e.target.value);
+                                setCurrentPage(0);
+                            }}
+                            className="p-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                        >
+                            <option value="all">All Status</option>
+                            <option value="billed">Billed</option>
+                            <option value="unbilled">Unbilled</option>
+                            <option value="paid">Paid</option>
+                            <option value="unpaid">Unpaid</option>
+                        </select>
+                        <div className="flex items-center">
+                            <label className="text-gray-700 dark:text-gray-300 text-sm mr-2">Evolutiva</label>
+                            <input
+                                type="checkbox"
+                                checked={typeFilter === 'EVOLUTIVA'}
+                                onChange={e => {
+                                    setTypeFilter(e.target.checked ? 'EVOLUTIVA' : null);
+                                    setCurrentPage(0);
+                                }}
+                                className="mr-2"
+                            />
+                            <label className="text-gray-700 dark:text-gray-300 text-sm mr-2">Correttiva</label>
+                            <input
+                                type="checkbox"
+                                checked={typeFilter === 'CORRETTIVA'}
+                                onChange={e => {
+                                    setTypeFilter(e.target.checked ? 'CORRETTIVA' : null);
+                                    setCurrentPage(0);
+                                }}
+                            />
+                        </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                        <label htmlFor="pageSizeSelect" className="text-gray-700 dark:text-gray-300">Items per page:</label>
+                        <select
+                            id="pageSizeSelect"
+                            value={pageSize}
+                            onChange={handlePageSizeChange}
+                            className="p-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                        >
+                            <option value="5">5</option>
+                            <option value="10">10</option>
+                            <option value="20">20</option>
+                            <option value="50">50</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
@@ -624,25 +1080,28 @@ const TaskListPage: React.FC = () => {
                         <thead className="bg-gray-50 dark:bg-gray-700">
                             <tr>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/12 cursor-pointer" onClick={() => handleSort('ticketId')}>
-                                    Task ID {sortConfig.key === 'ticketId' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                                    Task ID {sortField === 'ticketId' && (sortDirection === 'asc' ? '▲' : '▼')}
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-5/12 cursor-pointer" onClick={() => handleSort('description')}>
-                                    Description {sortConfig.key === 'description' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-4/12 cursor-pointer" onClick={() => handleSort('description')}>
+                                    Description {sortField === 'description' && (sortDirection === 'asc' ? '▲' : '▼')}
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-2/12 cursor-pointer" onClick={() => handleSort('projectName')}>
-                                    Project {sortConfig.key === 'projectName' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-2/12">
+                                    Project
                                 </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/12 cursor-pointer" onClick={() => handleSort('startDate')}>
-                                    Start Date {sortConfig.key === 'startDate' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                                    Start Date {sortField === 'startDate' && (sortDirection === 'asc' ? '▲' : '▼')}
                                 </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/12 cursor-pointer" onClick={() => handleSort('hoursWorked')}>
-                                    Hours {sortConfig.key === 'hoursWorked' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                                    Hours {sortField === 'hoursWorked' && (sortDirection === 'asc' ? '▲' : '▼')}
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/12">
+                                    Referenced Task
                                 </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/12 cursor-pointer" onClick={() => handleSort('type')}>
-                                    Type {sortConfig.key === 'type' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                                    Type {sortField === 'type' && (sortDirection === 'asc' ? '▲' : '▼')}
                                 </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/12 cursor-pointer" onClick={() => handleSort('isBilled')}>
-                                    Status {sortConfig.key === 'isBilled' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                                    Status {sortField === 'isBilled' && (sortDirection === 'asc' ? '▲' : '▼')}
                                 </th>
                                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/12">
                                     Actions
@@ -655,7 +1114,7 @@ const TaskListPage: React.FC = () => {
                                     <td className="px-6 py-4 break-words w-1/12">
                                         <div className="text-sm font-medium text-gray-900 dark:text-white">{task.ticketId}</div>
                                     </td>
-                                    <td className="px-6 py-4 w-5/12 max-w-0">
+                                    <td className="px-6 py-4 w-4/12 max-w-0">
                                         <div 
                                             className="text-sm text-gray-900 dark:text-white truncate"
                                             title={task.description}
@@ -678,19 +1137,32 @@ const TaskListPage: React.FC = () => {
                                     </td>
                                     <td className="px-6 py-4 break-words w-1/12">
                                         <div className="text-sm text-gray-500 dark:text-gray-300">
+                                            {task.referencedTaskId || '-'}
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4 break-words w-1/12">
+                                        <div className="text-sm text-gray-500 dark:text-gray-300">
                                             {task.type || '-'}
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 break-words w-1/12">
                                         <div className="flex space-x-2">
-                                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                                task.isBilled ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                                            }`}>
+                                            <span 
+                                                onClick={() => handleToggleBillingStatus(task)}
+                                                className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity ${
+                                                    task.isBilled ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                                                }`}
+                                                title="Click to toggle billing status"
+                                            >
                                                 {task.isBilled ? 'Billed' : 'Unbilled'}
                                             </span>
-                                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                                task.isPaid ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                                            }`}>
+                                            <span 
+                                                onClick={() => handleTogglePaymentStatus(task)}
+                                                className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity ${
+                                                    task.isPaid ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                                                }`}
+                                                title="Click to toggle payment status"
+                                            >
                                                 {task.isPaid ? 'Paid' : 'Unpaid'}
                                             </span>
                                         </div>

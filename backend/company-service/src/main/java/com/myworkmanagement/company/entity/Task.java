@@ -69,6 +69,9 @@ public class Task {
     @Column(name = "invoice_id")
     private String invoiceId;
 
+    @Column(name = "referenced_task_id")
+    private String referencedTaskId;
+
     @Column(columnDefinition = "TEXT")
     private String notes;
 

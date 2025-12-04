@@ -50,6 +50,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     initAuth();
+
+    // Listen for storage events to handle session expiration from other tabs
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'token' && !e.newValue) {
+        // Token was removed (session expired)
+        setState(initialState);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []); // Empty dependency array means this runs once on mount
 
   const login = async (credentials: LoginCredentials) => {

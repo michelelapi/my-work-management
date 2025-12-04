@@ -1,19 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { LoginCredentials } from '../../types/auth';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login, error, isLoading, isAuthenticated } = useAuth();
   const [formData, setFormData] = useState<LoginCredentials>({
     email: '',
     password: '',
   });
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated) {
       navigate('/dashboard');
+    }
+    // Check if redirected due to session expiration
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('expired') === 'true' || !localStorage.getItem('token')) {
+      setSessionExpired(true);
     }
   }, [isAuthenticated, navigate]);
 
@@ -38,6 +45,11 @@ const Login: React.FC = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8 bg-white dark:bg-gray-800 p-8 rounded-lg shadow-lg">
+        {sessionExpired && (
+          <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative mb-4" role="alert">
+            <span className="block sm:inline">Your session has expired. Please log in again.</span>
+          </div>
+        )}
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-white">
             Sign in to your account

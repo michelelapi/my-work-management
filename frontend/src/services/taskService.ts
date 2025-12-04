@@ -47,14 +47,57 @@ export const taskService = {
     },
 
     // Get all tasks for the authenticated user with pagination and filtering
-    async getTasks(projectId?: number, page: number = 0, size: number = 10, searchTerm?: string): Promise<PageResponse<Task>> {
-        const url = projectId 
-            ? `/projects/${projectId}/tasks`
+    async getTasks(
+        projectId?: number, 
+        page: number = 0, 
+        size: number = 10, 
+        searchTerm?: string,
+        isBilled?: boolean | null,
+        isPaid?: boolean | null,
+        sort?: string,
+        type?: string
+    ): Promise<PageResponse<Task>> {
+        // Check if projectId is a valid number (including 0)
+        // projectId can be 0, which is falsy but valid, so we need to check explicitly
+        // Also handle case where projectId might be passed as a string
+        let numericProjectId: number | undefined = undefined;
+        if (projectId !== undefined && projectId !== null) {
+            if (typeof projectId === 'number') {
+                numericProjectId = isNaN(projectId) ? undefined : projectId;
+            } else if (typeof projectId === 'string') {
+                const parsed = parseInt(projectId, 10);
+                numericProjectId = isNaN(parsed) ? undefined : parsed;
+            }
+        }
+        const hasProjectId = numericProjectId !== undefined;
+        
+        console.log('taskService.getTasks - projectId:', projectId, 'type:', typeof projectId, 'numericProjectId:', numericProjectId, 'hasProjectId:', hasProjectId);
+        
+        const url = hasProjectId
+            ? `/projects/${numericProjectId}/tasks`
             : '/tasks';
         const params: any = { page, size };
         if (searchTerm) {
             params.search = searchTerm;
         }
+        // Only add projectId filter if we're using the /tasks endpoint (not /projects/{id}/tasks)
+        // This is for the /tasks endpoint which accepts projectId as a query parameter
+        if (!url.includes('/projects/') && hasProjectId) {
+            params.projectId = numericProjectId;
+        }
+        if (isBilled !== undefined && isBilled !== null) {
+            params.isBilled = isBilled;
+        }
+        if (isPaid !== undefined && isPaid !== null) {
+            params.isPaid = isPaid;
+        }
+        if (type) {
+            params.type = type;
+        }
+        if (sort) {
+            params.sort = sort;
+        }
+        console.log('taskService.getTasks - Final URL:', url, 'params:', params);
         const response = await api.get<PageResponse<Task>>(url, {
             params
         });
@@ -131,6 +174,43 @@ export const taskService = {
 
     async updateTasksPaymentStatus(taskUpdates: TaskPaymentStatusUpdate[]): Promise<Task[]> {
         const response = await api.put<Task[]>(`/tasks/payment-status`, taskUpdates);
+        return response.data;
+    },
+
+    // Generate SAL PDF for Dedagroup
+    async generateSalPdf(
+        year: number,
+        month: number,
+        projectId?: number,
+        userName?: string,
+        userAddress?: string,
+        userPhone?: string,
+        userEmailAddress?: string,
+        projectName?: string
+    ): Promise<Blob> {
+        const params: any = { year, month };
+        if (projectId !== undefined) {
+            params.projectId = projectId;
+        }
+        if (userName) {
+            params.userName = userName;
+        }
+        if (userAddress) {
+            params.userAddress = userAddress;
+        }
+        if (userPhone) {
+            params.userPhone = userPhone;
+        }
+        if (userEmailAddress) {
+            params.userEmailAddress = userEmailAddress;
+        }
+        if (projectName) {
+            params.projectName = projectName;
+        }
+        const response = await api.get('/tasks/sal/pdf', {
+            params,
+            responseType: 'blob'
+        });
         return response.data;
     }
 }; 

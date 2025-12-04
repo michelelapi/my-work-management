@@ -53,7 +53,29 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     "FORMAT(t.startDate, 'dd/MM/yyyy') LIKE CONCAT('%', :startDate, '%'))")
     Page<Task> findByUserEmailAndSearch(@Param("userEmail") String userEmail, @Param("title") String title, @Param("description") String description, @Param("ticketId") String ticketId, @Param("startDate") String startDate, Pageable pageable);
     Page<Task> findByProjectIdAndTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCaseOrTicketIdContainingIgnoreCase(Long projectId, String title, String description, String ticketId, Pageable pageable);
-    Page<Task> findByUserEmailAndProjectIdAndTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCaseOrTicketIdContainingIgnoreCase(String userEmail, Long projectId, String title, String description, String ticketId, Pageable pageable);
+
+    @Query("SELECT t " +
+        "FROM Task t " +
+        "WHERE t.userEmail = :userEmail " +
+        "AND (:projectId IS NULL OR t.project.id = :projectId) " +
+        "AND (:type IS NULL OR t.type = :type) " +
+        "AND (:isBilled IS NULL OR t.isBilled = :isBilled) " +
+        "AND (:isPaid IS NULL OR t.isPaid = :isPaid) " +
+        "AND (" +
+        "   LOWER(t.title) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+        "   LOWER(t.description) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+        "   LOWER(t.ticketId) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+        "   FORMAT(t.startDate, 'dd/MM/yyyy') LIKE CONCAT('%', :searchTerm, '%')" +
+        ")")
+    Page<Task> findByUserEmailAndFilters(
+        @Param("userEmail") String userEmail,
+        @Param("projectId") Long projectId,
+        @Param("type") String type,
+        @Param("isBilled") Boolean isBilled,
+        @Param("isPaid") Boolean isPaid,
+        @Param("searchTerm") String searchTerm,
+        Pageable pageable
+    );
 
     @Query("SELECT COUNT(t) FROM Task t JOIN t.project p WHERE p.company.id = :companyId")
     Long countByCompanyId(@Param("companyId") Long companyId);

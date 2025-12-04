@@ -69,6 +69,9 @@ public class TaskDTO {
     @Schema(description = "ID of the invoice for this task", example = "INV-2024-001")
     private String invoiceId;
 
+    @Schema(description = "ID of the referenced task", example = "TSK-2024-ABC123")
+    private String referencedTaskId;
+
     @Schema(description = "Additional notes about the task", example = "Completed ahead of schedule")
     private String notes;
 

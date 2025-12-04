@@ -27,9 +27,13 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Handle unauthorized access
+      // Handle unauthorized access - session expired
       localStorage.removeItem('token');
-      window.location.href = '/login';
+      localStorage.removeItem('user');
+      // Redirect to login with expired parameter
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login?expired=true';
+      }
     }
     return Promise.reject(error);
   }

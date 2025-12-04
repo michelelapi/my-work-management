@@ -35,7 +35,11 @@ public interface TaskService {
     List<TaskDTO> getUnbilledTasksByUserEmailAndProject(String userEmail, Long projectId);
     List<TaskDTO> getUnpaidTasksByUserEmailAndProject(String userEmail, Long projectId);
     Page<TaskDTO> getTasksByUserEmail(String userEmail, Pageable pageable, String search);
+    Page<TaskDTO> getTasksByUserEmail(String userEmail, Pageable pageable, String search, Long projectId, Boolean isBilled, Boolean isPaid);
+    Page<TaskDTO> getTasksByUserEmail(String userEmail, Pageable pageable, String search, Long projectId, Boolean isBilled, Boolean isPaid, String type);
     Page<TaskDTO> getTasksByProject(Long projectId, Pageable pageable, String search);
+    Page<TaskDTO> getTasksByProject(Long projectId, Pageable pageable, String search, Boolean isBilled, Boolean isPaid, String userEmail);
+    Page<TaskDTO> getTasksByProject(Long projectId, Pageable pageable, String search, Boolean isBilled, Boolean isPaid, String userEmail, String type);
     Page<TaskDTO> getTasksByProjectAndDateRange(Long projectId, LocalDate startDate, LocalDate endDate, Pageable pageable);
     Page<TaskDTO> getUnbilledTasks(Pageable pageable);
     Page<TaskDTO> getUnpaidTasks(Pageable pageable);

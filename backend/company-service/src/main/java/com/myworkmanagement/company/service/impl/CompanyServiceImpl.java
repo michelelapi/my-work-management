@@ -21,13 +21,6 @@ public class CompanyServiceImpl implements CompanyService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<CompanyDTO> getAllCompanies(Pageable pageable) {
-        return companyRepository.findAll(pageable)
-                .map(this::mapToDTO);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
     public Page<CompanyDTO> getAllCompaniesByUserEmail(String userEmail, Pageable pageable) {
         return companyRepository.findAllByUserEmail(userEmail, pageable)
                 .map(this::mapToDTO);
@@ -70,13 +63,6 @@ public class CompanyServiceImpl implements CompanyService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<CompanyDTO> searchCompanies(String searchTerm, Pageable pageable) {
-        return companyRepository.searchCompanies(searchTerm, pageable)
-                .map(this::mapToDTO);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
     public boolean existsByName(String name) {
         return companyRepository.existsByName(name);
     }
@@ -91,14 +77,6 @@ public class CompanyServiceImpl implements CompanyService {
     @Transactional(readOnly = true)
     public boolean existsByTaxId(String taxId) {
         return companyRepository.existsByTaxId(taxId);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public CompanyDTO getCompanyByName(String name) {
-        return companyRepository.findByName(name)
-                .map(this::mapToDTO)
-                .orElseThrow(() -> new ResourceNotFoundException("Company not found with name: " + name));
     }
 
     private void validateCompanyUniqueness(CompanyDTO companyDTO) {

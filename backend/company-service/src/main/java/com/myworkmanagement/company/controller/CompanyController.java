@@ -110,32 +110,4 @@ public class CompanyController {
         companyService.deleteCompany(id);
         return ResponseEntity.noContent().build();
     }
-
-    @GetMapping("/search")
-    @Operation(summary = "Search companies", description = "Searches companies by name or email with pagination support")
-    @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Successfully retrieved companies"),
-        @ApiResponse(responseCode = "401", description = "Unauthorized"),
-        @ApiResponse(responseCode = "500", description = "Internal server error")
-    })
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
-    public ResponseEntity<Page<CompanyDTO>> searchCompanies(
-            @Parameter(description = "Search term to filter companies by name or email", required = true, example = "example") @RequestParam String searchTerm,
-            @Parameter(description = "Pagination parameters (page, size, sort)", required = false) Pageable pageable) {
-        return ResponseEntity.ok(companyService.searchCompanies(searchTerm, pageable));
-    }
-
-    @GetMapping("/name/{name}")
-    @Operation(summary = "Get company by name", description = "Retrieves a company by its exact name")
-    @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Successfully retrieved company"),
-        @ApiResponse(responseCode = "401", description = "Unauthorized"),
-        @ApiResponse(responseCode = "404", description = "Company not found"),
-        @ApiResponse(responseCode = "500", description = "Internal server error")
-    })
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
-    public ResponseEntity<CompanyDTO> getCompanyByName(
-            @Parameter(description = "Name of the company", required = true, example = "Acme Corp") @PathVariable String name) {
-        return ResponseEntity.ok(companyService.getCompanyByName(name));
-    }
 } 

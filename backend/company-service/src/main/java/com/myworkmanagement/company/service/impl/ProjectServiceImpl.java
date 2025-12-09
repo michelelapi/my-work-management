@@ -92,13 +92,6 @@ public class ProjectServiceImpl implements ProjectService {
                 .map(this::mapToDTO);
     }
 
-    @Override
-    public ProjectDTO getProjectByName(Long companyId, String projectName) {
-        Project project = projectRepository.findByCompanyIdAndName(companyId, projectName)
-                .orElseThrow(() -> new ResourceNotFoundException("Project not found with name: " + projectName + " for company: " + companyId));
-        return mapToDTO(project);
-    }
-
     private ProjectDTO mapToDTO(Project project) {
         return ProjectDTO.builder()
                 .id(project.getId())

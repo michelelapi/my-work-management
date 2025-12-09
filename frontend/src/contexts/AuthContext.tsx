@@ -51,17 +51,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     initAuth();
 
+    // Handle session expiration from API interceptor
+    const handleSessionExpired = () => {
+      // Clear auth state
+      authService.logout();
+      setState(initialState);
+      // Navigate to login page with expired parameter
+      navigate('/login?expired=true', { replace: true });
+    };
+
     // Listen for storage events to handle session expiration from other tabs
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'token' && !e.newValue) {
         // Token was removed (session expired)
         setState(initialState);
+        if (window.location.pathname !== '/login') {
+          navigate('/login?expired=true', { replace: true });
+        }
       }
     };
 
+    window.addEventListener('session-expired', handleSessionExpired);
     window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []); // Empty dependency array means this runs once on mount
+    
+    return () => {
+      window.removeEventListener('session-expired', handleSessionExpired);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [navigate]); // Include navigate in dependencies
 
   const login = async (credentials: LoginCredentials) => {
     setState(prev => ({ ...prev, isLoading: true, error: null })); // Set isLoading to true before API call

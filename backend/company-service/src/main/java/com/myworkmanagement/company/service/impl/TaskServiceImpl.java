@@ -131,62 +131,6 @@ public class TaskServiceImpl implements TaskService {
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public List<TaskDTO> getAllTasks() {
-        return taskRepository.findAll().stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<TaskDTO> getTasksByProject(Long projectId) {
-        return taskRepository.findByProjectId(projectId).stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<TaskDTO> getTasksByProjectAndDateRange(Long projectId, LocalDate startDate, LocalDate endDate) {
-        return taskRepository.findByProjectIdAndStartDateBetween(projectId, startDate, endDate).stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<TaskDTO> getUnbilledTasks() {
-        return taskRepository.findByIsBilledFalse().stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<TaskDTO> getUnpaidTasks() {
-        return taskRepository.findByIsPaidFalse().stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<TaskDTO> getUnbilledTasksByProject(Long projectId) {
-        return taskRepository.findByProjectIdAndIsBilledFalse(projectId).stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<TaskDTO> getUnpaidTasksByProject(Long projectId) {
-        return taskRepository.findByProjectIdAndIsPaidFalse(projectId).stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
-    }
-
-    @Override
     @Transactional
     public void deleteTask(Long id) {
         Task task = taskRepository.findById(id)
@@ -202,55 +146,6 @@ public class TaskServiceImpl implements TaskService {
         } catch (Exception e) {
             logger.error("Failed to delete task from Google Sheets: {}", e.getMessage());
         }
-    }
-
-    // New methods for user email filtering
-    @Override
-    @Transactional(readOnly = true)
-    public List<TaskDTO> getTasksByUserEmail(String userEmail) {
-        return taskRepository.findByUserEmail(userEmail).stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<TaskDTO> getTasksByUserEmailAndProject(String userEmail, Long projectId) {
-        return taskRepository.findByUserEmailAndProjectId(userEmail, projectId).stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<TaskDTO> getUnbilledTasksByUserEmail(String userEmail) {
-        return taskRepository.findByUserEmailAndIsBilledFalse(userEmail).stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<TaskDTO> getUnpaidTasksByUserEmail(String userEmail) {
-        return taskRepository.findByUserEmailAndIsPaidFalse(userEmail).stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<TaskDTO> getUnbilledTasksByUserEmailAndProject(String userEmail, Long projectId) {
-        return taskRepository.findByUserEmailAndProjectIdAndIsBilledFalse(userEmail, projectId).stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<TaskDTO> getUnpaidTasksByUserEmailAndProject(String userEmail, Long projectId) {
-        return taskRepository.findByUserEmailAndProjectIdAndIsPaidFalse(userEmail, projectId).stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
     }
 
     @Override
@@ -616,23 +511,6 @@ public class TaskServiceImpl implements TaskService {
                 task.getPaymentDate() != null ? task.getPaymentDate().toString() : "",
                 task.getInvoiceId() != null ? task.getInvoiceId() : ""
         );
-    }
-
-    public void putTasksOnGoogleSheets(String userEmail) {
-        List<Task> tasks = taskRepository.findByUserEmail(userEmail);
-        tasks = tasks.stream().sorted(Comparator.comparing(Task::getStartDate).reversed()).collect(Collectors.toList());
-
-        // Sync to Google Sheets
-        try {
-            List<List<Object>> list = tasks.stream()
-            .map(this::mapTaskToSheetRow)
-            .collect(Collectors.toList());
-
-            googleSheetsService.addBulk(list);
-        } catch (Exception e) {
-            logger.error("Failed to add task to Google Sheets: {}", e.getMessage());
-        }
-
     }
 
     /**

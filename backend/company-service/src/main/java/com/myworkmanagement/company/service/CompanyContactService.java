@@ -14,10 +14,4 @@ public interface CompanyContactService {
     CompanyContactDTO updateCompanyContact(Long companyId, Long contactId, CompanyContactDTO contactDTO);
     
     void deleteCompanyContact(Long companyId, Long contactId);
-    
-    Page<CompanyContactDTO> searchContacts(Long companyId, String searchTerm, Pageable pageable);
-    
-    CompanyContactDTO getPrimaryContact(Long companyId);
-    
-    boolean existsPrimaryContact(Long companyId);
 } 

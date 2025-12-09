@@ -3,6 +3,13 @@ package com.myworkmanagement.company.controller;
 import com.myworkmanagement.company.dto.TaskDTO;
 import com.myworkmanagement.company.dto.TaskBillingStatusUpdateDTO;
 import com.myworkmanagement.company.dto.TaskPaymentStatusUpdateDTO;
+import com.myworkmanagement.company.entity.Company;
+import com.myworkmanagement.company.entity.Project;
+import com.myworkmanagement.company.entity.Task;
+import com.myworkmanagement.company.exception.ResourceNotFoundException;
+import com.myworkmanagement.company.repository.CompanyRepository;
+import com.myworkmanagement.company.repository.ProjectRepository;
+import com.myworkmanagement.company.repository.TaskRepository;
 import com.myworkmanagement.company.service.SalPdfService;
 import com.myworkmanagement.company.service.TaskService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -40,6 +47,9 @@ public class TaskController {
 
     private final TaskService taskService;
     private final SalPdfService salPdfService;
+    private final CompanyRepository companyRepository;
+    private final TaskRepository taskRepository;
+    private final ProjectRepository projectRepository;
 
     @PostMapping("/projects/{projectId}/tasks")
     @Operation(summary = "Create new task", description = "Creates a new task for a project")
@@ -354,22 +364,6 @@ public class TaskController {
         return ResponseEntity.ok(taskService.updateTasksPaymentStatus(taskUpdates));
     }
 
-    @PutMapping("/tasks/addBulk")
-    @Operation(summary = "Put all the tasks on Google Sheets", description = "Update Google Sheets with all the tasks")
-    @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Successfully retrieved tasks"),
-        @ApiResponse(responseCode = "401", description = "Unauthorized"),
-        @ApiResponse(responseCode = "404", description = "Project not found"),
-        @ApiResponse(responseCode = "500", description = "Internal server error")
-    })
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
-    public ResponseEntity<Void> putTasksOnGoogleSheets() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String userEmail = authentication.getName();
-        taskService.putTasksOnGoogleSheets(userEmail);
-        return ResponseEntity.noContent().build();
-    }
-
     @GetMapping("/tasks/sal/pdf")
     @Operation(summary = "Generate SAL PDF for Dedagroup", description = "Generates a formal SAL PDF document for the specified month/year")
     @ApiResponses(value = {
@@ -396,23 +390,86 @@ public class TaskController {
             LocalDate endDate = startDate.withDayOfMonth(startDate.lengthOfMonth());
             LocalDate reportMonth = startDate;
             
-            // Fetch tasks for the month
+            // Find Dedagroup company
+            Company dedagroupCompany = companyRepository.findByName("Dedagroup")
+                .orElseThrow(() -> new ResourceNotFoundException("Company 'Dedagroup' not found"));
+            
+            // Fetch tasks for the month - only from Dedagroup company
             List<TaskDTO> tasks;
             if (projectId != null) {
+                // Verify the project belongs to Dedagroup
+                Project project = projectRepository.findById(projectId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Project not found with id: " + projectId));
+                
+                if (!dedagroupCompany.getId().equals(project.getCompany().getId())) {
+                    throw new IllegalArgumentException("Project does not belong to Dedagroup company");
+                }
+                
                 // Get tasks for specific project in date range
-                tasks = taskService.getTasksByProjectAndDateRange(projectId, startDate, endDate, 
+                List<Task> projectTasks = taskRepository.findByProjectIdAndStartDateBetween(
+                    projectId, startDate, endDate, 
                     org.springframework.data.domain.PageRequest.of(0, Integer.MAX_VALUE)).getContent();
+                
+                // Convert Task entities to TaskDTOs
+                tasks = projectTasks.stream()
+                    .map(task -> TaskDTO.builder()
+                        .id(task.getId())
+                        .projectId(task.getProject().getId())
+                        .projectName(task.getProject().getName())
+                        .companyName(task.getProject().getCompany().getName())
+                        .title(task.getTitle())
+                        .description(task.getDescription())
+                        .ticketId(task.getTicketId())
+                        .startDate(task.getStartDate())
+                        .endDate(task.getEndDate())
+                        .hoursWorked(task.getHoursWorked())
+                        .rateUsed(task.getRateUsed())
+                        .type(task.getType())
+                        .currency(task.getCurrency())
+                        .isBilled(task.getIsBilled())
+                        .isPaid(task.getIsPaid())
+                        .billingDate(task.getBillingDate())
+                        .paymentDate(task.getPaymentDate())
+                        .invoiceId(task.getInvoiceId())
+                        .referencedTaskId(task.getReferencedTaskId())
+                        .notes(task.getNotes())
+                        .userEmail(task.getUserEmail())
+                        .createdAt(task.getCreatedAt())
+                        .updatedAt(task.getUpdatedAt())
+                        .build())
+                    .collect(java.util.stream.Collectors.toList());
             } else {
-                // Get all tasks for user in the date range
-                Page<TaskDTO> allUserTasks = taskService.getTasksByUserEmail(userEmail, 
-                    org.springframework.data.domain.PageRequest.of(0, Integer.MAX_VALUE), null);
-                tasks = allUserTasks.getContent()
-                    .stream()
-                    .filter(t -> {
-                        if (t.getStartDate() == null) return false;
-                        LocalDate taskDate = t.getStartDate();
-                        return !taskDate.isBefore(startDate) && !taskDate.isAfter(endDate);
-                    })
+                // Get all tasks for user from Dedagroup company in the date range
+                List<Task> dedagroupTasks = taskRepository.findByUserEmailAndCompanyIdAndDateRange(
+                    userEmail, dedagroupCompany.getId(), startDate, endDate);
+                
+                // Convert Task entities to TaskDTOs
+                tasks = dedagroupTasks.stream()
+                    .map(task -> TaskDTO.builder()
+                        .id(task.getId())
+                        .projectId(task.getProject().getId())
+                        .projectName(task.getProject().getName())
+                        .companyName(task.getProject().getCompany().getName())
+                        .title(task.getTitle())
+                        .description(task.getDescription())
+                        .ticketId(task.getTicketId())
+                        .startDate(task.getStartDate())
+                        .endDate(task.getEndDate())
+                        .hoursWorked(task.getHoursWorked())
+                        .rateUsed(task.getRateUsed())
+                        .type(task.getType())
+                        .currency(task.getCurrency())
+                        .isBilled(task.getIsBilled())
+                        .isPaid(task.getIsPaid())
+                        .billingDate(task.getBillingDate())
+                        .paymentDate(task.getPaymentDate())
+                        .invoiceId(task.getInvoiceId())
+                        .referencedTaskId(task.getReferencedTaskId())
+                        .notes(task.getNotes())
+                        .userEmail(task.getUserEmail())
+                        .createdAt(task.getCreatedAt())
+                        .updatedAt(task.getUpdatedAt())
+                        .build())
                     .collect(java.util.stream.Collectors.toList());
             }
             

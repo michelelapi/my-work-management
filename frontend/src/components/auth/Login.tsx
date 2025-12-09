@@ -18,11 +18,11 @@ const Login: React.FC = () => {
       navigate('/dashboard');
     }
     // Check if redirected due to session expiration
-    const urlParams = new URLSearchParams(window.location.search);
+    const urlParams = new URLSearchParams(location.search);
     if (urlParams.get('expired') === 'true' || !localStorage.getItem('token')) {
       setSessionExpired(true);
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, location.search]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;

@@ -5,8 +5,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 public interface CompanyService {
-    Page<CompanyDTO> getAllCompanies(Pageable pageable);
-    
     Page<CompanyDTO> getAllCompaniesByUserEmail(String userEmail, Pageable pageable);
     
     CompanyDTO getCompanyById(Long id);
@@ -17,13 +15,9 @@ public interface CompanyService {
     
     void deleteCompany(Long id);
     
-    Page<CompanyDTO> searchCompanies(String searchTerm, Pageable pageable);
-    
     boolean existsByName(String name);
     
     boolean existsByEmail(String email);
     
     boolean existsByTaxId(String taxId);
-    
-    CompanyDTO getCompanyByName(String name);
 } 

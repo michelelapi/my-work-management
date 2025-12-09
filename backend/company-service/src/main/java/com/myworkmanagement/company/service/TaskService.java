@@ -21,19 +21,6 @@ public interface TaskService {
     TaskDTO updateTask(Long id, TaskDTO taskDTO);
 
     TaskDTO getTask(Long id);
-    List<TaskDTO> getAllTasks();
-    List<TaskDTO> getTasksByProject(Long projectId);
-    List<TaskDTO> getTasksByProjectAndDateRange(Long projectId, LocalDate startDate, LocalDate endDate);
-    List<TaskDTO> getUnbilledTasks();
-    List<TaskDTO> getUnpaidTasks();
-    List<TaskDTO> getUnbilledTasksByProject(Long projectId);
-    List<TaskDTO> getUnpaidTasksByProject(Long projectId);
-    List<TaskDTO> getTasksByUserEmail(String userEmail);
-    List<TaskDTO> getTasksByUserEmailAndProject(String userEmail, Long projectId);
-    List<TaskDTO> getUnbilledTasksByUserEmail(String userEmail);
-    List<TaskDTO> getUnpaidTasksByUserEmail(String userEmail);
-    List<TaskDTO> getUnbilledTasksByUserEmailAndProject(String userEmail, Long projectId);
-    List<TaskDTO> getUnpaidTasksByUserEmailAndProject(String userEmail, Long projectId);
     Page<TaskDTO> getTasksByUserEmail(String userEmail, Pageable pageable, String search);
     Page<TaskDTO> getTasksByUserEmail(String userEmail, Pageable pageable, String search, Long projectId, Boolean isBilled, Boolean isPaid);
     Page<TaskDTO> getTasksByUserEmail(String userEmail, Pageable pageable, String search, Long projectId, Boolean isBilled, Boolean isPaid, String type);
@@ -67,6 +54,4 @@ public interface TaskService {
      * @throws TaskPaymentStatusException if any task is not found or update fails
      */
     List<TaskDTO> updateTasksPaymentStatus(List<TaskPaymentStatusUpdateDTO> taskUpdates);
-    void putTasksOnGoogleSheets(String userEmail);
-
 } 

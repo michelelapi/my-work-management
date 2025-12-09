@@ -30,9 +30,10 @@ api.interceptors.response.use(
       // Handle unauthorized access - session expired
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      // Redirect to login with expired parameter
+      // Dispatch custom event to notify AuthContext about session expiration
+      // This allows React Router navigation to be handled properly
       if (window.location.pathname !== '/login') {
-        window.location.href = '/login?expired=true';
+        window.dispatchEvent(new CustomEvent('session-expired'));
       }
     }
     return Promise.reject(error);

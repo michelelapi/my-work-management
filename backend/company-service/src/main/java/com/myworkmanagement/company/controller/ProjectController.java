@@ -146,19 +146,4 @@ public class ProjectController {
             @Parameter(description = "Pagination parameters (page, size, sort)", required = false) Pageable pageable) {
         return ResponseEntity.ok(projectService.searchProjects(companyId, searchTerm, pageable));
     }
-
-    @GetMapping("/companies/{companyId}/projects/name/{projectName}")
-    @Operation(summary = "Get project by name", description = "Retrieves a project by its name for a specific company")
-    @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Successfully retrieved project"),
-        @ApiResponse(responseCode = "401", description = "Unauthorized"),
-        @ApiResponse(responseCode = "404", description = "Company or project not found"),
-        @ApiResponse(responseCode = "500", description = "Internal server error")
-    })
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
-    public ResponseEntity<ProjectDTO> getProjectByName(
-            @Parameter(description = "Unique identifier of the company", required = true, example = "1") @PathVariable Long companyId,
-            @Parameter(description = "Name of the project", required = true, example = "Website Redesign") @PathVariable String projectName) {
-        return ResponseEntity.ok(projectService.getProjectByName(companyId, projectName));
-    }
 } 

@@ -104,32 +104,4 @@ public class CompanyContactController {
         contactService.deleteCompanyContact(companyId, contactId);
         return ResponseEntity.noContent().build();
     }
-
-    @GetMapping("/search")
-    @Operation(summary = "Search contacts", description = "Searches contacts by name or email with pagination support")
-    @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Successfully retrieved contacts"),
-        @ApiResponse(responseCode = "401", description = "Unauthorized"),
-        @ApiResponse(responseCode = "404", description = "Company not found"),
-        @ApiResponse(responseCode = "500", description = "Internal server error")
-    })
-    public ResponseEntity<Page<CompanyContactDTO>> searchContacts(
-            @Parameter(description = "Unique identifier of the company", required = true, example = "1") @PathVariable Long companyId,
-            @Parameter(description = "Search term to filter contacts by name or email", required = true, example = "john") @RequestParam String searchTerm,
-            @Parameter(description = "Pagination parameters (page, size, sort)", required = false) Pageable pageable) {
-        return ResponseEntity.ok(contactService.searchContacts(companyId, searchTerm, pageable));
-    }
-
-    @GetMapping("/primary")
-    @Operation(summary = "Get primary contact", description = "Retrieves the primary contact for a company")
-    @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Successfully retrieved primary contact"),
-        @ApiResponse(responseCode = "401", description = "Unauthorized"),
-        @ApiResponse(responseCode = "404", description = "Company not found or no primary contact exists"),
-        @ApiResponse(responseCode = "500", description = "Internal server error")
-    })
-    public ResponseEntity<CompanyContactDTO> getPrimaryContact(
-            @Parameter(description = "Unique identifier of the company", required = true, example = "1") @PathVariable Long companyId) {
-        return ResponseEntity.ok(contactService.getPrimaryContact(companyId));
-    }
 } 

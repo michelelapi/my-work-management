@@ -81,30 +81,6 @@ public class CompanyContactServiceImpl implements CompanyContactService {
         contactRepository.delete(contact);
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public Page<CompanyContactDTO> searchContacts(Long companyId, String searchTerm, Pageable pageable) {
-        validateCompanyExists(companyId);
-        return contactRepository.searchContacts(companyId, searchTerm, pageable)
-                .map(this::mapToDTO);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public CompanyContactDTO getPrimaryContact(Long companyId) {
-        validateCompanyExists(companyId);
-        return contactRepository.findByCompanyIdAndIsPrimaryTrue(companyId)
-                .map(this::mapToDTO)
-                .orElseThrow(() -> new ResourceNotFoundException("No primary contact found for company: " + companyId));
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public boolean existsPrimaryContact(Long companyId) {
-        validateCompanyExists(companyId);
-        return contactRepository.existsByCompanyIdAndIsPrimaryTrue(companyId);
-    }
-
     private Company validateCompanyExists(Long companyId) {
         return companyRepository.findById(companyId)
                 .orElseThrow(() -> new ResourceNotFoundException("Company not found with id: " + companyId));

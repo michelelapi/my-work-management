@@ -161,11 +161,12 @@ public class TaskServiceImpl implements TaskService {
         }
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public Page<TaskDTO> getTasksByUserEmail(String userEmail, Pageable pageable, String search, Long projectId, Boolean isBilled, Boolean isPaid) {
-        return getTasksByUserEmail(userEmail, pageable, search, projectId, isBilled, isPaid, null);
-    }
+    // Not used in TaskController - controller uses the 7-parameter version with 'type' parameter
+    // @Override
+    // @Transactional(readOnly = true)
+    // public Page<TaskDTO> getTasksByUserEmail(String userEmail, Pageable pageable, String search, Long projectId, Boolean isBilled, Boolean isPaid) {
+    //     return getTasksByUserEmail(userEmail, pageable, search, projectId, isBilled, isPaid, null);
+    // }
 
     @Override
     @Transactional(readOnly = true)
@@ -259,24 +260,26 @@ public class TaskServiceImpl implements TaskService {
         return tasks.map(this::convertToDTO);
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public Page<TaskDTO> getTasksByProject(Long projectId, Pageable pageable, String search) {
-        if (search != null && !search.trim().isEmpty()) {
-            String searchTerm = search.toLowerCase();
-            return taskRepository.findByProjectIdAndTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCaseOrTicketIdContainingIgnoreCase(projectId, searchTerm, searchTerm, searchTerm, pageable)
-                    .map(this::convertToDTO);
-        } else {
-            return taskRepository.findByProjectId(projectId, pageable)
-                    .map(this::convertToDTO);
-        }
-    }
+    // Not used in TaskController - controller uses the 7-parameter version with all filters
+    // @Override
+    // @Transactional(readOnly = true)
+    // public Page<TaskDTO> getTasksByProject(Long projectId, Pageable pageable, String search) {
+    //     if (search != null && !search.trim().isEmpty()) {
+    //         String searchTerm = search.toLowerCase();
+    //         return taskRepository.findByProjectIdAndTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCaseOrTicketIdContainingIgnoreCase(projectId, searchTerm, searchTerm, searchTerm, pageable)
+    //                 .map(this::convertToDTO);
+    //     } else {
+    //         return taskRepository.findByProjectId(projectId, pageable)
+    //                 .map(this::convertToDTO);
+    //     }
+    // }
 
-    @Override
-    @Transactional(readOnly = true)
-    public Page<TaskDTO> getTasksByProject(Long projectId, Pageable pageable, String search, Boolean isBilled, Boolean isPaid, String userEmail) {
-        return getTasksByProject(projectId, pageable, search, isBilled, isPaid, userEmail, null);
-    }
+    // Not used in TaskController - controller uses the 7-parameter version with 'type' parameter
+    // @Override
+    // @Transactional(readOnly = true)
+    // public Page<TaskDTO> getTasksByProject(Long projectId, Pageable pageable, String search, Boolean isBilled, Boolean isPaid, String userEmail) {
+    //     return getTasksByProject(projectId, pageable, search, isBilled, isPaid, userEmail, null);
+    // }
 
     @Override
     @Transactional(readOnly = true)

@@ -15,9 +15,12 @@ public interface CompanyService {
     
     void deleteCompany(Long id);
     
-    boolean existsByName(String name);
+    // Not used in CompanyController - only used internally for validation
+    // boolean existsByName(String name);
     
-    boolean existsByEmail(String email);
+    // Not used in CompanyController - only used internally for validation
+    // boolean existsByEmail(String email);
     
-    boolean existsByTaxId(String taxId);
+    // Not used in CompanyController - only used internally for validation
+    // boolean existsByTaxId(String taxId);
 } 

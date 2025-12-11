@@ -22,10 +22,13 @@ public interface TaskService {
 
     TaskDTO getTask(Long id);
     Page<TaskDTO> getTasksByUserEmail(String userEmail, Pageable pageable, String search);
-    Page<TaskDTO> getTasksByUserEmail(String userEmail, Pageable pageable, String search, Long projectId, Boolean isBilled, Boolean isPaid);
+    // Not used in TaskController - controller uses the 7-parameter version with 'type' parameter
+    // Page<TaskDTO> getTasksByUserEmail(String userEmail, Pageable pageable, String search, Long projectId, Boolean isBilled, Boolean isPaid);
     Page<TaskDTO> getTasksByUserEmail(String userEmail, Pageable pageable, String search, Long projectId, Boolean isBilled, Boolean isPaid, String type);
-    Page<TaskDTO> getTasksByProject(Long projectId, Pageable pageable, String search);
-    Page<TaskDTO> getTasksByProject(Long projectId, Pageable pageable, String search, Boolean isBilled, Boolean isPaid, String userEmail);
+    // Not used in TaskController - controller uses the 7-parameter version with all filters
+    // Page<TaskDTO> getTasksByProject(Long projectId, Pageable pageable, String search);
+    // Not used in TaskController - controller uses the 7-parameter version with 'type' parameter
+    // Page<TaskDTO> getTasksByProject(Long projectId, Pageable pageable, String search, Boolean isBilled, Boolean isPaid, String userEmail);
     Page<TaskDTO> getTasksByProject(Long projectId, Pageable pageable, String search, Boolean isBilled, Boolean isPaid, String userEmail, String type);
     Page<TaskDTO> getTasksByProjectAndDateRange(Long projectId, LocalDate startDate, LocalDate endDate, Pageable pageable);
     Page<TaskDTO> getUnbilledTasks(Pageable pageable);

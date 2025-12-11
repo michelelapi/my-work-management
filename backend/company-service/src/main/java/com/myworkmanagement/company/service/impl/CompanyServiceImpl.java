@@ -61,32 +61,35 @@ public class CompanyServiceImpl implements CompanyService {
         companyRepository.deleteById(id);
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public boolean existsByName(String name) {
-        return companyRepository.existsByName(name);
-    }
+    // Not used in CompanyController - only used internally for validation
+    // @Override
+    // @Transactional(readOnly = true)
+    // public boolean existsByName(String name) {
+    //     return companyRepository.existsByName(name);
+    // }
 
-    @Override
-    @Transactional(readOnly = true)
-    public boolean existsByEmail(String email) {
-        return companyRepository.existsByEmail(email);
-    }
+    // Not used in CompanyController - only used internally for validation
+    // @Override
+    // @Transactional(readOnly = true)
+    // public boolean existsByEmail(String email) {
+    //     return companyRepository.existsByEmail(email);
+    // }
 
-    @Override
-    @Transactional(readOnly = true)
-    public boolean existsByTaxId(String taxId) {
-        return companyRepository.existsByTaxId(taxId);
-    }
+    // Not used in CompanyController - only used internally for validation
+    // @Override
+    // @Transactional(readOnly = true)
+    // public boolean existsByTaxId(String taxId) {
+    //     return companyRepository.existsByTaxId(taxId);
+    // }
 
     private void validateCompanyUniqueness(CompanyDTO companyDTO) {
-        if (companyDTO.getName() != null && existsByName(companyDTO.getName())) {
+        if (companyDTO.getName() != null && companyRepository.existsByName(companyDTO.getName())) {
             throw new IllegalArgumentException("Company with name " + companyDTO.getName() + " already exists");
         }
-        if (companyDTO.getEmail() != null && existsByEmail(companyDTO.getEmail())) {
+        if (companyDTO.getEmail() != null && companyRepository.existsByEmail(companyDTO.getEmail())) {
             throw new IllegalArgumentException("Company with email " + companyDTO.getEmail() + " already exists");
         }
-        if (companyDTO.getTaxId() != null && existsByTaxId(companyDTO.getTaxId())) {
+        if (companyDTO.getTaxId() != null && companyRepository.existsByTaxId(companyDTO.getTaxId())) {
             throw new IllegalArgumentException("Company with tax ID " + companyDTO.getTaxId() + " already exists");
         }
     }

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Task } from '../types/task';
 import { taskService, PageResponse } from '../services/taskService';
 import projectService from '../services/projectService';
@@ -13,7 +13,9 @@ import { FaFilePdf } from "@react-icons/all-files/fa/FaFilePdf"
 const TaskListPage: React.FC = () => {
     const { projectId } = useParams<{ projectId: string }>();
     const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
     const [tasks, setTasks] = useState<Task[]>([]);
+    const [allFilteredTasks, setAllFilteredTasks] = useState<Task[]>([]); // Store all filtered tasks for summary
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -57,6 +59,15 @@ const TaskListPage: React.FC = () => {
     const [projectFilter, setProjectFilter] = useState<number | null>(null);
     const [projects, setProjects] = useState<Project[]>([]);
 
+    // Date filter state from URL query params
+    const [monthFilter, setMonthFilter] = useState<string | null>(null);
+    const [yearFilter, setYearFilter] = useState<string | null>(null);
+
+    // Debug: Log when filters change
+    useEffect(() => {
+        console.log('Filter state changed - monthFilter:', monthFilter, 'yearFilter:', yearFilter);
+    }, [monthFilter, yearFilter]);
+
     // Status filter state
     const [statusFilter, setStatusFilter] = useState<string>('all'); // 'all', 'billed', 'unbilled', 'paid', 'unpaid'
 
@@ -83,11 +94,91 @@ const TaskListPage: React.FC = () => {
     const totalAmount = tasks.reduce((sum, task) => sum + (task.hoursWorked * (task.rateUsed ?? 0)), 0);
     const totalHours = tasks.reduce((sum, task) => sum + (task.hoursWorked || 0), 0);
 
+    // Calculate project summaries - group tasks by project and calculate totals
+    // Use allFilteredTasks to show summary for all filtered tasks, not just current page
+    const projectSummaries = allFilteredTasks.reduce((acc, task) => {
+        const projectName = task.projectName || 'Unknown Project';
+        const projectId = task.projectId || 0;
+        const key = `${projectId}-${projectName}`;
+        
+        if (!acc[key]) {
+            acc[key] = {
+                projectId,
+                projectName,
+                totalHours: 0,
+                totalAmount: 0,
+                currency: task.currency || 'EUR',
+                taskCount: 0
+            };
+        }
+        
+        acc[key].totalHours += task.hoursWorked || 0;
+        acc[key].totalAmount += (task.hoursWorked || 0) * (task.rateUsed || 0);
+        acc[key].taskCount += 1;
+        
+        return acc;
+    }, {} as Record<string, {
+        projectId: number;
+        projectName: string;
+        totalHours: number;
+        totalAmount: number;
+        currency: string;
+        taskCount: number;
+    }>);
+
+    const projectSummaryArray = Object.values(projectSummaries).sort((a, b) => 
+        b.totalAmount - a.totalAmount // Sort by total amount descending
+    );
+
     const handleCopy = (value: string, field: string) => {
         navigator.clipboard.writeText(value);
         setCopiedField(field);
         setTimeout(() => setCopiedField(null), 1000);
     };
+
+    // Read URL query parameters on mount and when they change
+    useEffect(() => {
+        const month = searchParams.get('month');
+        const year = searchParams.get('year');
+        const projectIdParam = searchParams.get('projectId');
+        
+        console.log('Reading URL params - month:', month, 'year:', year, 'projectId:', projectIdParam);
+        console.log('Full URL search params:', searchParams.toString());
+        
+        if (month) {
+            console.log('Setting monthFilter to:', month);
+            setMonthFilter(month);
+        } else {
+            console.log('Clearing monthFilter');
+            setMonthFilter(null);
+        }
+        
+        if (year) {
+            console.log('Setting yearFilter to:', year);
+            setYearFilter(year);
+        } else {
+            console.log('Clearing yearFilter');
+            setYearFilter(null);
+        }
+        
+        if (projectIdParam) {
+            const parsedProjectId = parseInt(projectIdParam, 10);
+            if (!isNaN(parsedProjectId)) {
+                console.log('Setting projectFilter to:', parsedProjectId);
+                setProjectFilter(parsedProjectId);
+            } else {
+                setProjectFilter(null);
+            }
+        } else {
+            // Only clear projectFilter if we're not in a project-specific route
+            if (!projectId) {
+                setProjectFilter(null);
+            }
+        }
+        
+        // Reset to first page when filters change
+        setCurrentPage(0);
+    }, [searchParams, projectId]);
 
     // Fetch projects for filter
     useEffect(() => {
@@ -116,16 +207,31 @@ const TaskListPage: React.FC = () => {
             try {
                 setLoading(true);
                 
-                // Determine project filter (URL param takes precedence)
-                // Handle projectFilter: if it's a number (including 0), use it; if null/undefined, use undefined
-                const effectiveProjectId: number | undefined = projectId 
-                    ? parseInt(projectId) 
-                    : (projectFilter !== null && projectFilter !== undefined) 
-                        ? projectFilter 
-                        : undefined;
+                // Determine project filter - prioritize manual selection (state) over URL params
+                // This allows users to override the projectId from chart click by using the dropdown
+                const urlProjectId = searchParams.get('projectId');
+                let effectiveProjectId: number | undefined = undefined;
+                
+                // Priority: 1. Manual dropdown selection (projectFilter state), 2. Route param, 3. URL query param
+                if (projectFilter !== null && projectFilter !== undefined) {
+                    // User manually selected from dropdown - use that
+                    effectiveProjectId = projectFilter;
+                } else if (projectId) {
+                    // Route parameter (e.g., /projects/:projectId/tasks)
+                    const parsed = parseInt(projectId, 10);
+                    if (!isNaN(parsed)) {
+                        effectiveProjectId = parsed;
+                    }
+                } else if (urlProjectId) {
+                    // URL query param from chart click
+                    const parsed = parseInt(urlProjectId, 10);
+                    if (!isNaN(parsed)) {
+                        effectiveProjectId = parsed;
+                    }
+                }
                 
                 // Debug logging
-                console.log('Fetch tasks - projectFilter:', projectFilter, 'projectId:', projectId, 'effectiveProjectId:', effectiveProjectId, 'type of projectFilter:', typeof projectFilter);
+                console.log('Fetch tasks - urlProjectId:', urlProjectId, 'projectFilter:', projectFilter, 'route projectId:', projectId, 'effectiveProjectId:', effectiveProjectId);
                 
                 // Determine status filters
                 let isBilled: boolean | undefined = undefined;
@@ -143,31 +249,209 @@ const TaskListPage: React.FC = () => {
                 // Build sort parameter
                 const sortParam = `${sortField},${sortDirection}`;
                 
-                console.log('Calling getTasks with:', {
-                    effectiveProjectId,
-                    currentPage,
-                    pageSize,
-                    debouncedSearchTerm,
-                    isBilled,
-                    isPaid,
-                    sortParam,
-                    typeFilter
-                });
+                let response: PageResponse<Task>;
+                let allTasks: Task[] = [];
                 
-                const response = await taskService.getTasks(
-                    effectiveProjectId,
-                    currentPage,
-                    pageSize,
-                    debouncedSearchTerm,
-                    isBilled,
-                    isPaid,
-                    sortParam,
-                    typeFilter || undefined
-                );
+                // Check URL params directly for date filters (in case state hasn't updated)
+                const urlMonth = searchParams.get('month');
+                const urlYear = searchParams.get('year');
+                const hasDateFilter = monthFilter || yearFilter || urlMonth || urlYear;
                 
-                setTasks(response.content);
-                setTotalPages(response.totalPages);
-                setTotalElements(response.totalElements);
+                // If date filters are active, fetch ALL pages to ensure we get all matching tasks
+                // Otherwise use normal pagination
+                if (hasDateFilter) {
+                    console.log('Date filter active - fetching all pages...', 'monthFilter:', monthFilter, 'yearFilter:', yearFilter, 'urlMonth:', urlMonth, 'urlYear:', urlYear);
+                    // Fetch all pages
+                    let page = 0;
+                    let hasMore = true;
+                    const pageSizeForFetch = 1000; // Reasonable page size for fetching all
+                    
+                    while (hasMore) {
+                        console.log(`Fetching page ${page}...`);
+                        const pageResponse = await taskService.getTasks(
+                            effectiveProjectId,
+                            page,
+                            pageSizeForFetch,
+                            debouncedSearchTerm,
+                            isBilled,
+                            isPaid,
+                            sortParam,
+                            typeFilter || undefined
+                        );
+                        
+                        console.log(`Page ${page}: got ${pageResponse.content.length} tasks, totalPages: ${pageResponse.totalPages}`);
+                        allTasks = allTasks.concat(pageResponse.content);
+                        hasMore = page < pageResponse.totalPages - 1;
+                        page++;
+                        
+                        // Safety limit to prevent infinite loops
+                        if (page > 1000) {
+                            console.warn('Reached safety limit of 1000 pages');
+                            break;
+                        }
+                    }
+                    
+                    console.log('Fetched all pages - total tasks:', allTasks.length);
+                    // Create a mock response for consistency
+                    response = {
+                        content: allTasks,
+                        totalElements: allTasks.length,
+                        totalPages: 1,
+                        size: allTasks.length,
+                        number: 0
+                    };
+                } else {
+                    // Normal pagination
+                    console.log('Calling getTasks with:', {
+                        effectiveProjectId,
+                        currentPage,
+                        pageSize,
+                        debouncedSearchTerm,
+                        isBilled,
+                        isPaid,
+                        sortParam,
+                        typeFilter
+                    });
+                    
+                    response = await taskService.getTasks(
+                        effectiveProjectId,
+                        currentPage,
+                        pageSize,
+                        debouncedSearchTerm,
+                        isBilled,
+                        isPaid,
+                        sortParam,
+                        typeFilter || undefined
+                    );
+                }
+                
+                // Filter tasks by month/year if filters are set
+                // Note: Backend filters (search, status, type, project) are already applied via API call above
+                // We only need to apply date filtering on the frontend since backend doesn't support it
+                // Use the same URL params we checked earlier
+                const activeMonthFilter = monthFilter || urlMonth;
+                const activeYearFilter = yearFilter || urlYear;
+                
+                let filteredTasks = response.content;
+                console.log('Before date filtering - tasks count:', filteredTasks.length);
+                console.log('Applied backend filters - search:', debouncedSearchTerm, 'status:', statusFilter, 'type:', typeFilter, 'project:', effectiveProjectId);
+                console.log('Date filters - monthFilter:', monthFilter, 'yearFilter:', yearFilter);
+                console.log('URL params - month:', urlMonth, 'year:', urlYear);
+                console.log('Active date filters - month:', activeMonthFilter, 'year:', activeYearFilter);
+                
+                if (activeMonthFilter) {
+                    // Filter by month (format: YYYY-MM)
+                    const [year, month] = activeMonthFilter.split('-');
+                    const targetYear = parseInt(year, 10);
+                    const targetMonth = parseInt(month, 10);
+                    console.log('Filtering by month - monthFilter:', monthFilter, 'targetYear:', targetYear, 'targetMonth:', targetMonth);
+                    
+                    // Sample a few task dates for debugging
+                    if (filteredTasks.length > 0) {
+                        console.log('Sample task dates (first 5):', filteredTasks.slice(0, 5).map(t => ({ id: t.id, startDate: t.startDate })));
+                    }
+                    
+                    filteredTasks = filteredTasks.filter(task => {
+                        if (!task.startDate) {
+                            return false;
+                        }
+                        // Parse the date string directly (YYYY-MM-DD format from backend)
+                        // Extract just the date part (YYYY-MM-DD) if there's a time component
+                        const dateStr = task.startDate.split('T')[0]; // Remove time if present
+                        const dateParts = dateStr.split('-');
+                        if (dateParts.length !== 3) {
+                            console.log('Invalid date format for task:', task.id, 'startDate:', task.startDate);
+                            return false;
+                        }
+                        const taskYear = parseInt(dateParts[0], 10);
+                        const taskMonth = parseInt(dateParts[1], 10);
+                        
+                        const matches = taskYear === targetYear && taskMonth === targetMonth;
+                        if (matches) {
+                            console.log('Task matches filter:', task.id, 'date:', task.startDate, 'parsed year:', taskYear, 'parsed month:', taskMonth);
+                        }
+                        return matches;
+                    });
+                    console.log('After month filtering - tasks count:', filteredTasks.length);
+                    if (filteredTasks.length > 0) {
+                        console.log('Sample filtered tasks (first 3):', filteredTasks.slice(0, 3).map(t => ({ id: t.id, startDate: t.startDate })));
+                    } else {
+                        console.warn('No tasks found matching month filter:', activeMonthFilter);
+                        console.log('Sample of all task dates (first 10):', response.content.slice(0, 10).map(t => t.startDate));
+                    }
+                } else if (activeYearFilter) {
+                    // Filter by year (format: YYYY)
+                    const targetYear = parseInt(activeYearFilter, 10);
+                    console.log('Filtering by year - targetYear:', targetYear);
+                    
+                    filteredTasks = filteredTasks.filter(task => {
+                        if (!task.startDate) return false;
+                        // Extract just the date part (YYYY-MM-DD) if there's a time component
+                        const dateStr = task.startDate.split('T')[0];
+                        const dateParts = dateStr.split('-');
+                        if (dateParts.length !== 3) {
+                            return false;
+                        }
+                        const taskYear = parseInt(dateParts[0], 10);
+                        return taskYear === targetYear;
+                    });
+                    console.log('After year filtering - tasks count:', filteredTasks.length);
+                }
+                
+                // Apply pagination to filtered results if date filters are active
+                if (activeMonthFilter || activeYearFilter) {
+                    // Store all filtered tasks for summary calculation (all pages)
+                    setAllFilteredTasks(filteredTasks);
+                    const startIndex = currentPage * pageSize;
+                    const endIndex = startIndex + pageSize;
+                    const paginatedTasks = filteredTasks.slice(startIndex, endIndex);
+                    setTasks(paginatedTasks);
+                    setTotalPages(Math.ceil(filteredTasks.length / pageSize));
+                    setTotalElements(filteredTasks.length);
+                } else {
+                    // For normal pagination, we need to fetch all tasks if we want accurate summaries
+                    // But only if filters are active (to avoid performance issues)
+                    const hasActiveFilters = effectiveProjectId !== undefined || 
+                                           debouncedSearchTerm || 
+                                           statusFilter !== 'all' || 
+                                           typeFilter !== null;
+                    
+                    if (hasActiveFilters) {
+                        // Fetch all pages to get accurate summary
+                        let allTasksForSummary: Task[] = [];
+                        let page = 0;
+                        let hasMore = true;
+                        const pageSizeForSummary = 1000;
+                        
+                        while (hasMore) {
+                            const summaryResponse = await taskService.getTasks(
+                                effectiveProjectId,
+                                page,
+                                pageSizeForSummary,
+                                debouncedSearchTerm,
+                                isBilled,
+                                isPaid,
+                                sortParam,
+                                typeFilter || undefined
+                            );
+                            
+                            allTasksForSummary = allTasksForSummary.concat(summaryResponse.content);
+                            hasMore = page < summaryResponse.totalPages - 1;
+                            page++;
+                            
+                            if (page > 1000) break; // Safety limit
+                        }
+                        
+                        setAllFilteredTasks(allTasksForSummary);
+                    } else {
+                        // No filters active, clear the summary
+                        setAllFilteredTasks([]);
+                    }
+                    
+                    setTasks(filteredTasks);
+                    setTotalPages(response.totalPages);
+                    setTotalElements(response.totalElements);
+                }
         
             } catch (err) {
                 setError('Failed to fetch tasks. Please try again later.');
@@ -179,7 +463,7 @@ const TaskListPage: React.FC = () => {
 
         fetchTasks();
 
-    }, [projectId, projectFilter, currentPage, pageSize, debouncedSearchTerm, typeFilter, statusFilter, sortField, sortDirection]);
+    }, [projectId, projectFilter, currentPage, pageSize, debouncedSearchTerm, typeFilter, statusFilter, sortField, sortDirection, monthFilter, yearFilter, searchParams]);
 
     useEffect(() => {
         if (searchTermRef.current && !loading) {
@@ -626,43 +910,77 @@ const TaskListPage: React.FC = () => {
                 </div>
             )}
 
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {projectId ? 'Project Tasks' : 'All Tasks'}
-                </h1>
-                <div className="flex space-x-4">
+            {/* Header Section */}
+            <div className="mb-6">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+                    <div>
+                        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+                            {projectId ? 'Project Tasks' : 'All Tasks'}
+                        </h1>
+                        {(monthFilter || yearFilter) && (
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-sm text-gray-600 dark:text-gray-400">
+                                    Filtered by: 
+                                </span>
+                                <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full text-sm font-medium">
+                                    {monthFilter 
+                                        ? new Date(monthFilter + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+                                        : yearFilter + ' (Year)'}
+                                </span>
+                                <button
+                                    onClick={() => {
+                                        const newParams = new URLSearchParams(searchParams);
+                                        newParams.delete('month');
+                                        newParams.delete('year');
+                                        newParams.delete('projectId');
+                                        setSearchParams(newParams);
+                                        setMonthFilter(null);
+                                        setYearFilter(null);
+                                        setProjectFilter(null);
+                                    }}
+                                    className="text-sm text-red-600 dark:text-red-400 hover:underline font-medium"
+                                >
+                                    Clear filters
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                    <button
+                        onClick={() => navigate('/tasks/new')}
+                        className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2.5 rounded-md transition-colors font-medium shadow-md hover:shadow-lg"
+                    >
+                        + Add New Task
+                    </button>
+                </div>
+
+                {/* Action Buttons Group */}
+                <div className="flex flex-wrap gap-2 mb-4">
                     <button
                         onClick={() => setBillingStatusModalOpen(true)}
-                        className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md transition-colors flex items-center"
+                        className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md transition-colors flex items-center text-sm"
                     >
                         <FaCheck className="mr-2" />
-                        Update Status Billing
+                        Update Billing Status
                     </button>
                     <button
                         onClick={() => setPaymentStatusModalOpen(true)}
-                        className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md transition-colors flex items-center"
+                        className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md transition-colors flex items-center text-sm"
                     >
                         <FaCheck className="mr-2" />
-                        Update Status Payment
+                        Update Payment Status
                     </button>
                     <button
                         onClick={() => setInfoForBillModalOpen(true)}
-                        className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-md transition-colors flex items-center"
+                        className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-md transition-colors text-sm"
                     >
                         Info For Bill
                     </button>
                     <button
                         onClick={() => setSalModalOpen(true)}
-                        className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-md transition-colors flex items-center"
+                        className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-md transition-colors flex items-center text-sm"
                     >
                         <FaFilePdf className="mr-2" />
-                        Generate SAL for Dedagroup
-                    </button>
-                    <button
-                        onClick={() => navigate('/tasks/new')}
-                        className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md transition-colors"
-                    >
-                        Add New Task
+                        Generate SAL
                     </button>
                 </div>
             </div>
@@ -979,35 +1297,48 @@ const TaskListPage: React.FC = () => {
                 </div>
             )}
 
-            {/* Filter and Page Size Controls */}
-            <div className="flex flex-col space-y-4 mb-4">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0 md:space-x-4">
-                    <div className="flex flex-wrap items-center gap-4 w-full md:w-2/3">
+            {/* Filter Section */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 mb-4">
+                <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
+                    {/* Search Bar */}
+                    <div className="flex-1 w-full lg:w-auto">
                         <input
                             type="text"
                             placeholder="Search tasks..."
                             ref={searchTermRef}
                             value={searchTerm}
                             onChange={handleSearchChange}
-                            className="flex-1 min-w-[200px] p-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                            className="w-full p-2.5 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         />
+                    </div>
+
+                    {/* Filters Row */}
+                    <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
                         {!projectId && (
                             <select
-                                value={projectFilter !== null ? projectFilter : ''}
+                                value={projectFilter !== null ? projectFilter : (searchParams.get('projectId') || '')}
                                 onChange={(e) => {
                                     const value = e.target.value;
                                     console.log('Project dropdown changed - value:', value, 'type:', typeof value);
+                                    
+                                    // Update URL params to sync with dropdown selection
+                                    const newParams = new URLSearchParams(searchParams);
                                     if (value && value !== '') {
                                         const parsedValue = parseInt(value, 10);
                                         console.log('Setting projectFilter to:', parsedValue);
                                         setProjectFilter(isNaN(parsedValue) ? null : parsedValue);
+                                        // Update URL to keep it in sync
+                                        newParams.set('projectId', value);
                                     } else {
                                         console.log('Setting projectFilter to null');
                                         setProjectFilter(null);
+                                        // Remove projectId from URL when clearing
+                                        newParams.delete('projectId');
                                     }
+                                    setSearchParams(newParams);
                                     setCurrentPage(0);
                                 }}
-                                className="p-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                className="p-2.5 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-w-[180px]"
                             >
                                 <option value="">All Projects</option>
                                 {projects.map(project => (
@@ -1017,13 +1348,14 @@ const TaskListPage: React.FC = () => {
                                 ))}
                             </select>
                         )}
+                        
                         <select
                             value={statusFilter}
                             onChange={(e) => {
                                 setStatusFilter(e.target.value);
                                 setCurrentPage(0);
                             }}
-                            className="p-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                            className="p-2.5 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-w-[140px]"
                         >
                             <option value="all">All Status</option>
                             <option value="billed">Billed</option>
@@ -1031,44 +1363,99 @@ const TaskListPage: React.FC = () => {
                             <option value="paid">Paid</option>
                             <option value="unpaid">Unpaid</option>
                         </select>
-                        <div className="flex items-center">
-                            <label className="text-gray-700 dark:text-gray-300 text-sm mr-2">Evolutiva</label>
-                            <input
-                                type="checkbox"
-                                checked={typeFilter === 'EVOLUTIVA'}
-                                onChange={e => {
-                                    setTypeFilter(e.target.checked ? 'EVOLUTIVA' : null);
-                                    setCurrentPage(0);
-                                }}
-                                className="mr-2"
-                            />
-                            <label className="text-gray-700 dark:text-gray-300 text-sm mr-2">Correttiva</label>
-                            <input
-                                type="checkbox"
-                                checked={typeFilter === 'CORRETTIVA'}
-                                onChange={e => {
-                                    setTypeFilter(e.target.checked ? 'CORRETTIVA' : null);
-                                    setCurrentPage(0);
-                                }}
-                            />
+
+                        {/* Type Checkboxes */}
+                        <div className="flex items-center gap-4 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700">
+                            <label className="flex items-center cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={typeFilter === 'EVOLUTIVA'}
+                                    onChange={e => {
+                                        setTypeFilter(e.target.checked ? 'EVOLUTIVA' : null);
+                                        setCurrentPage(0);
+                                    }}
+                                    className="mr-2 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                />
+                                <span className="text-sm text-gray-700 dark:text-gray-300">Evolutiva</span>
+                            </label>
+                            <label className="flex items-center cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={typeFilter === 'CORRETTIVA'}
+                                    onChange={e => {
+                                        setTypeFilter(e.target.checked ? 'CORRETTIVA' : null);
+                                        setCurrentPage(0);
+                                    }}
+                                    className="mr-2 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                />
+                                <span className="text-sm text-gray-700 dark:text-gray-300">Correttiva</span>
+                            </label>
                         </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                        <label htmlFor="pageSizeSelect" className="text-gray-700 dark:text-gray-300">Items per page:</label>
-                        <select
-                            id="pageSizeSelect"
-                            value={pageSize}
-                            onChange={handlePageSizeChange}
-                            className="p-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                        >
-                            <option value="5">5</option>
-                            <option value="10">10</option>
-                            <option value="20">20</option>
-                            <option value="50">50</option>
-                        </select>
+
+                        {/* Page Size */}
+                        <div className="flex items-center gap-2 ml-auto lg:ml-0">
+                            <label htmlFor="pageSizeSelect" className="text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">Items per page:</label>
+                            <select
+                                id="pageSizeSelect"
+                                value={pageSize}
+                                onChange={handlePageSizeChange}
+                                className="p-2.5 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            >
+                                <option value="5">5</option>
+                                <option value="10">10</option>
+                                <option value="20">20</option>
+                                <option value="50">50</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
             </div>
+
+            {/* Project Summary Section - Only show when filters are active */}
+            {(() => {
+                const urlMonth = searchParams.get('month');
+                const urlYear = searchParams.get('year');
+                const urlProjectId = searchParams.get('projectId');
+                const hasActiveFilters = monthFilter || yearFilter || urlMonth || urlYear ||
+                                       projectFilter !== null || urlProjectId ||
+                                       debouncedSearchTerm || statusFilter !== 'all' || typeFilter !== null;
+                
+                return hasActiveFilters && allFilteredTasks.length > 0 && projectSummaryArray.length > 0;
+            })() && (
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 mb-4">
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Project Summary</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {projectSummaryArray.map((summary) => (
+                            <div 
+                                key={`${summary.projectId}-${summary.projectName}`}
+                                className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-700/50"
+                            >
+                                <h3 className="font-medium text-gray-900 dark:text-white mb-2 truncate" title={summary.projectName}>
+                                    {summary.projectName}
+                                </h3>
+                                <div className="space-y-1 text-sm">
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-600 dark:text-gray-400">Tasks:</span>
+                                        <span className="font-medium text-gray-900 dark:text-white">{summary.taskCount}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-600 dark:text-gray-400">Total Hours:</span>
+                                        <span className="font-medium text-gray-900 dark:text-white">
+                                            {summary.totalHours.toFixed(2)}h
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between border-t border-gray-200 dark:border-gray-600 pt-1 mt-1">
+                                        <span className="text-gray-600 dark:text-gray-400 font-medium">Total Amount:</span>
+                                        <span className="font-bold text-blue-600 dark:text-blue-400">
+                                            {summary.totalAmount.toFixed(2)} {summary.currency}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {tasks.length === 0 && !loading ? (
                 <div className="text-center text-gray-500 dark:text-gray-400 mt-10">

@@ -51,7 +51,8 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
         "   LOWER(t.title) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
         "   LOWER(t.description) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
         "   LOWER(t.ticketId) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
-        "   FORMAT(t.startDate, 'dd/MM/yyyy') LIKE CONCAT('%', :searchTerm, '%')" +
+        "   FORMAT(t.startDate, 'dd/MM/yyyy') LIKE CONCAT('%', :searchTerm, '%') OR" +
+        "   LOWER(t.invoiceId) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
         ")")
     Page<Task> findByUserEmailAndFilters(
         @Param("userEmail") String userEmail,

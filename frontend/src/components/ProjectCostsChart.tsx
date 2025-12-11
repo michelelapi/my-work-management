@@ -1,7 +1,10 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import * as Recharts from 'recharts';
 import { TooltipProps } from 'recharts';
 import { ProjectCost, statisticsService } from '../services/statisticsService';
+import projectService from '../services/projectService';
+import { Project } from '../types/project';
 
 const { LabelList } = Recharts;
 
@@ -21,10 +24,12 @@ const CustomTooltip: React.FC<TooltipProps<number, string>> = ({ active, payload
 };
 
 const ProjectCostsChart: React.FC = () => {
+  const navigate = useNavigate();
   const [rawCosts, setRawCosts] = useState<ProjectCost[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [groupBy, setGroupBy] = useState<'month' | 'year'>('month');
+  const [projects, setProjects] = useState<Project[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -40,6 +45,18 @@ const ProjectCostsChart: React.FC = () => {
     };
 
     fetchData();
+  }, []);
+
+  useEffect(() => {
+    const fetchProjects = async () => {
+      try {
+        const fetchedProjects = await projectService.getAllProjectsForUser();
+        setProjects(fetchedProjects);
+      } catch (err) {
+        console.error('Error fetching projects:', err);
+      }
+    };
+    fetchProjects();
   }, []);
 
   const processedData = useMemo(() => {
@@ -91,6 +108,35 @@ const ProjectCostsChart: React.FC = () => {
     return projectColors;
   }, [processedData.projectNames]);
 
+  // Create click handler for each project bar
+  const createBarClickHandler = (projectName: string) => (data: any, index: number, e: React.MouseEvent) => {
+    if (!data || !data.group) return;
+
+    const period = data.group as string;
+    
+    // Find project ID by name
+    const project = projects.find(p => p.name === projectName);
+    const projectId = project?.id;
+
+    // Build query parameters
+    const params = new URLSearchParams();
+    
+    if (groupBy === 'month') {
+      // Format: YYYY-MM
+      params.set('month', period);
+    } else {
+      // Format: YYYY
+      params.set('year', period);
+    }
+    
+    if (projectId !== undefined) {
+      params.set('projectId', projectId.toString());
+    }
+
+    // Navigate to tasks page with filters
+    navigate(`/tasks?${params.toString()}`);
+  };
+
   if (loading) {
     return <div className="animate-pulse">Loading project costs...</div>;
   }
@@ -135,7 +181,15 @@ const ProjectCostsChart: React.FC = () => {
             <Recharts.Tooltip content={<CustomTooltip />} />
             <Recharts.Legend />
             {processedData.projectNames.map(name => (
-              <Recharts.Bar key={name} dataKey={name} stackId="a" fill={colors[name]} name={name}>
+              <Recharts.Bar 
+                key={name} 
+                dataKey={name} 
+                stackId="a" 
+                fill={colors[name]} 
+                name={name}
+                style={{ cursor: 'pointer' }}
+                onClick={createBarClickHandler(name)}
+              >
                 {groupBy === 'year' && (
                   <LabelList dataKey={name} 
                     position="top" 

@@ -1489,9 +1489,6 @@ const TaskListPage: React.FC = () => {
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/12 cursor-pointer" onClick={() => handleSort('hoursWorked')}>
                                     Hours {sortField === 'hoursWorked' && (sortDirection === 'asc' ? '▲' : '▼')}
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/12">
-                                    Referenced Task
-                                </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/12 cursor-pointer" onClick={() => handleSort('type')}>
                                     Type {sortField === 'type' && (sortDirection === 'asc' ? '▲' : '▼')}
                                 </th>
@@ -1527,12 +1524,7 @@ const TaskListPage: React.FC = () => {
                                     </td>
                                     <td className="px-6 py-4 break-words w-1/12">
                                         <div className="text-sm text-gray-500 dark:text-gray-300">
-                                            {task.hoursWorked} hours
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 break-words w-1/12">
-                                        <div className="text-sm text-gray-500 dark:text-gray-300">
-                                            {task.referencedTaskId || '-'}
+                                            {task.hoursWorked} h
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 break-words w-1/12">

@@ -10,6 +10,14 @@ import { FaTrash } from "@react-icons/all-files/fa/FaTrash"
 import { FaCheck } from "@react-icons/all-files/fa/FaCheck"
 import { FaFilePdf } from "@react-icons/all-files/fa/FaFilePdf"
 
+// Helper function to format numbers with thousands separators
+const formatNumber = (value: number, decimals: number = 2): string => {
+    return value.toLocaleString('en-US', {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
+    });
+};
+
 const TaskListPage: React.FC = () => {
     const { projectId } = useParams<{ projectId: string }>();
     const navigate = useNavigate();
@@ -1184,11 +1192,11 @@ const TaskListPage: React.FC = () => {
                                         <input
                                             type="text"
                                             readOnly
-                                            value={totalHours.toFixed(2)}
+                                            value={formatNumber(totalHours)}
                                             className="flex-1 px-2 py-1 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white text-xs"
                                         />
                                         <button
-                                            onClick={() => handleCopy(totalHours.toFixed(2), 'hours')}
+                                            onClick={() => handleCopy(formatNumber(totalHours), 'hours')}
                                             className="px-2 py-1 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 text-xs"
                                         >
                                             {copiedField === 'hours' ? 'Copied!' : 'Copy'}
@@ -1218,11 +1226,11 @@ const TaskListPage: React.FC = () => {
                                         <input
                                             type="text"
                                             readOnly
-                                            value={totalAmount.toFixed(2)}
+                                            value={formatNumber(totalAmount)}
                                             className="flex-1 px-2 py-1 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white text-xs"
                                         />
                                         <button
-                                            onClick={() => handleCopy(totalAmount.toFixed(2), 'amount')}
+                                            onClick={() => handleCopy(formatNumber(totalAmount), 'amount')}
                                             className="px-2 py-1 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 text-xs"
                                         >
                                             {copiedField === 'amount' ? 'Copied!' : 'Copy'}
@@ -1441,13 +1449,13 @@ const TaskListPage: React.FC = () => {
                                     <div className="flex justify-between">
                                         <span className="text-gray-600 dark:text-gray-400">Total Hours:</span>
                                         <span className="font-medium text-gray-900 dark:text-white">
-                                            {summary.totalHours.toFixed(2)}h
+                                            {formatNumber(summary.totalHours)}h
                                         </span>
                                     </div>
                                     <div className="flex justify-between border-t border-gray-200 dark:border-gray-600 pt-1 mt-1">
                                         <span className="text-gray-600 dark:text-gray-400 font-medium">Total Amount:</span>
                                         <span className="font-bold text-blue-600 dark:text-blue-400">
-                                            {summary.totalAmount.toFixed(2)} {summary.currency}
+                                            {formatNumber(summary.totalAmount)} {summary.currency}
                                         </span>
                                     </div>
                                 </div>

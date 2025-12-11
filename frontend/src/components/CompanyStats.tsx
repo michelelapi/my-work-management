@@ -1,6 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { CompanyProjectStats, statisticsService } from '../services/statisticsService';
 
+// Helper function to format numbers with thousands separators
+const formatNumber = (value: number, decimals: number = 2): string => {
+    return value.toLocaleString('en-US', {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
+    });
+};
+
 const CompanyStats: React.FC = () => {
   const [stats, setStats] = useState<CompanyProjectStats[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,13 +49,13 @@ const CompanyStats: React.FC = () => {
               <div>
                 <p className="text-gray-600 dark:text-gray-300">Projects: {stat.projectCount}</p>
                 <p className="text-gray-600 dark:text-gray-300">Tasks: {stat.taskCount}</p>
-                <p className="text-yellow-600 dark:text-yellow-300">To be billed: {stat.currency === 'EUR' ? '€' : '$'}{(stat.totalToBeBilledAmount ?? 0).toFixed(2)}</p>
-                <p className="text-yellow-600 dark:text-yellow-300">To be paid: {stat.currency === 'EUR' ? '€' : '$'}{(stat.totalToBePaidAmount ?? 0).toFixed(2)}</p>
+                <p className="text-yellow-600 dark:text-yellow-300">To be billed: {stat.currency === 'EUR' ? '€' : '$'}{formatNumber(stat.totalToBeBilledAmount ?? 0)}</p>
+                <p className="text-yellow-600 dark:text-yellow-300">To be paid: {stat.currency === 'EUR' ? '€' : '$'}{formatNumber(stat.totalToBePaidAmount ?? 0)}</p>
               </div>
               <div>
-                <p className="text-gray-600 dark:text-gray-300">Total Hours: {stat.totalHours}</p>
+                <p className="text-gray-600 dark:text-gray-300">Total Hours: {formatNumber(stat.totalHours)}</p>
                 <p className="text-gray-600 dark:text-gray-300">
-                  Total Amount: {stat.currency === 'EUR' ? '€' : '$'}{(stat.totalAmount ?? 0).toFixed(2)}
+                  Total Amount: {stat.currency === 'EUR' ? '€' : '$'}{formatNumber(stat.totalAmount ?? 0)}
                 </p>
               </div>
             </div>

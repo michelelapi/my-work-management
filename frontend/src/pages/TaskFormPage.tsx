@@ -26,7 +26,9 @@ const TaskFormPage: React.FC = () => {
         hoursWorked: 0,
         isBilled: false,
         isPaid: false,
-        referencedTaskId: ''
+        referencedTaskId: '',
+        type: 'CORRETTIVA',
+        currency: 'EUR'
     });
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);

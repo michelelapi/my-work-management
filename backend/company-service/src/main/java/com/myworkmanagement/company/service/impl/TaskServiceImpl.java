@@ -53,6 +53,19 @@ public class TaskServiceImpl implements TaskService {
             taskDTO.setTicketId(ticketId);
         }
 
+        // Set default values if not provided
+        String type = taskDTO.getType();
+        if (type == null || type.trim().isEmpty()) {
+            type = "CORRETTIVA";
+            taskDTO.setType(type);
+        }
+        
+        String currency = taskDTO.getCurrency();
+        if (currency == null || currency.trim().isEmpty()) {
+            currency = "EUR";
+            taskDTO.setCurrency(currency);
+        }
+
         Task task = Task.builder()
                 .project(project)
                 .title(taskDTO.getTitle())
@@ -62,8 +75,8 @@ public class TaskServiceImpl implements TaskService {
                 .endDate(taskDTO.getEndDate())
                 .hoursWorked(taskDTO.getHoursWorked())
                 .rateUsed(taskDTO.getRateUsed())
-                .type(taskDTO.getType())
-                .currency(taskDTO.getCurrency())
+                .type(type)
+                .currency(currency)
                 .isBilled(taskDTO.getIsBilled())
                 .isPaid(taskDTO.getIsPaid())
                 .billingDate(taskDTO.getBillingDate())

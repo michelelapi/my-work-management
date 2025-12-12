@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { CompanyProjectStats, statisticsService } from '../services/statisticsService';
 
 // Helper function to format numbers with thousands separators
@@ -10,6 +11,7 @@ const formatNumber = (value: number, decimals: number = 2): string => {
 };
 
 const CompanyStats: React.FC = () => {
+  const navigate = useNavigate();
   const [stats, setStats] = useState<CompanyProjectStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +45,11 @@ const CompanyStats: React.FC = () => {
       <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Company Overview</h3>
       <div className="flex flex-row space-x-4 overflow-x-auto">
         {stats.map((stat) => (
-          <div key={stat.companyId} className="bg-white dark:bg-gray-700 p-4 rounded-lg min-w-[320px]">
+          <div 
+            key={stat.companyId} 
+            onClick={() => navigate(`/companies/${stat.companyId}/edit`)}
+            className="bg-white dark:bg-gray-700 p-4 rounded-lg min-w-[320px] cursor-pointer hover:shadow-lg transition-shadow duration-200"
+          >
             <h4 className="font-medium text-gray-900 dark:text-white mb-2">{stat.companyName}</h4>
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div>

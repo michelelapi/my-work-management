@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as Recharts from 'recharts';
-import { TooltipProps } from 'recharts';
+import { TooltipProps, LegendProps } from 'recharts';
 import { ProjectCost, statisticsService } from '../services/statisticsService';
 import projectService from '../services/projectService';
 import { Project } from '../types/project';
@@ -20,6 +20,51 @@ const CustomTooltip: React.FC<TooltipProps<number, string>> = ({ active, payload
         </div>
       ))}
     </div>
+  );
+};
+
+// Custom Legend component with click handlers
+interface CustomLegendProps extends LegendProps {
+  projects: Project[];
+  navigate: (path: string) => void;
+}
+
+const CustomLegend: React.FC<CustomLegendProps> = ({ payload, projects, navigate }) => {
+  if (!payload || !payload.length) return null;
+
+  const handleLegendClick = (projectName: string) => {
+    if (!projectName) return;
+    const project = projects.find(p => p.name === projectName);
+    if (project && project.companyId && project.id) {
+      navigate(`/companies/${project.companyId}/projects/${project.id}/edit`);
+    }
+  };
+
+  return (
+    <ul className="flex flex-wrap justify-center gap-4 mt-4" style={{ listStyle: 'none', padding: 0 }}>
+      {payload.map((entry, index) => {
+        if (!entry || !entry.value) return null;
+        return (
+          <li
+            key={`item-${index}`}
+            onClick={() => handleLegendClick(entry.value as string)}
+            className="flex items-center cursor-pointer hover:opacity-80 transition-opacity"
+            style={{ cursor: 'pointer' }}
+          >
+            <span
+              style={{
+                display: 'inline-block',
+                width: '14px',
+                height: '14px',
+                backgroundColor: entry.color,
+                marginRight: '8px',
+              }}
+            />
+            <span style={{ color: entry.color }}>{entry.value}</span>
+          </li>
+        );
+      })}
+    </ul>
   );
 };
 
@@ -179,7 +224,7 @@ const ProjectCostsChart: React.FC = () => {
             <Recharts.XAxis dataKey="group" />
             <Recharts.YAxis />
             <Recharts.Tooltip content={<CustomTooltip />} />
-            <Recharts.Legend />
+            <Recharts.Legend content={<CustomLegend projects={projects} navigate={navigate} />} />
             {processedData.projectNames.map(name => (
               <Recharts.Bar 
                 key={name} 

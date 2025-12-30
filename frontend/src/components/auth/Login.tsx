@@ -15,11 +15,14 @@ const Login: React.FC = () => {
 
   useEffect(() => {
     if (isAuthenticated) {
+      // Clear session expired message when user successfully authenticates
+      setSessionExpired(false);
       navigate('/dashboard');
+      return;
     }
     // Check if redirected due to session expiration
     const urlParams = new URLSearchParams(location.search);
-    if (urlParams.get('expired') === 'true' || !localStorage.getItem('token')) {
+    if (urlParams.get('expired') === 'true') {
       setSessionExpired(true);
     }
   }, [isAuthenticated, navigate, location.search]);
@@ -99,7 +102,7 @@ const Login: React.FC = () => {
               disabled={isLoading}
               className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
-              {isLoading ? 'Signing in...' : 'Sign in--'}
+              {isLoading ? 'Signing in...' : 'Sign in'}
             </button>
           </div>
 

@@ -28,12 +28,27 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       // Handle unauthorized access - session expired
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      // Dispatch custom event to notify AuthContext about session expiration
-      // This allows React Router navigation to be handled properly
-      if (window.location.pathname !== '/login') {
-        window.dispatchEvent(new CustomEvent('session-expired'));
+      const currentPath = window.location.pathname;
+      
+      // Only handle session expiration if not already on login page
+      if (currentPath !== '/login' && currentPath !== '/register') {
+        // Clear authentication data
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        
+        // Dispatch custom event to notify AuthContext about session expiration
+        // This allows React Router navigation to be handled properly
+        window.dispatchEvent(new CustomEvent('session-expired', { 
+          detail: { redirectTo: '/login?expired=true' } 
+        }));
+        
+        // Fallback: Direct navigation if event doesn't work (e.g., during initial load)
+        // Use setTimeout to allow React Router to handle it first
+        setTimeout(() => {
+          if (window.location.pathname !== '/login') {
+            window.location.href = '/login?expired=true';
+          }
+        }, 100);
       }
     }
     return Promise.reject(error);

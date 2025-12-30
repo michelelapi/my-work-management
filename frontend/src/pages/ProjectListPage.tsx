@@ -120,13 +120,10 @@ const ProjectListPage: React.FC = () => {
         </div>
       )}
 
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          {companyIdNum ? `Projects for Company ${companyIdNum}` : 'My Projects'}
-        </h1>
+      <div className="flex justify-end items-center mb-6">
         <Link
           to={companyIdNum ? `/companies/${companyIdNum}/projects/new` : '/projects/new'}
-          className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md transition-colors"
+          className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2.5 rounded-md transition-colors font-medium shadow-md hover:shadow-lg"
         >
           Create New Project
         </Link>

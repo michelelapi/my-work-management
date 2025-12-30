@@ -52,12 +52,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     initAuth();
 
     // Handle session expiration from API interceptor
-    const handleSessionExpired = () => {
+    const handleSessionExpired = (event?: CustomEvent) => {
       // Clear auth state
       authService.logout();
       setState(initialState);
-      // Navigate to login page with expired parameter
-      navigate('/login?expired=true', { replace: true });
+      
+      // Get redirect path from event detail or use default
+      const redirectTo = event?.detail?.redirectTo || '/login?expired=true';
+      
+      // Only navigate if not already on login/register page
+      const currentPath = window.location.pathname;
+      if (currentPath !== '/login' && currentPath !== '/register') {
+        navigate(redirectTo, { replace: true });
+      }
     };
 
     // Listen for storage events to handle session expiration from other tabs
@@ -71,11 +78,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     };
 
-    window.addEventListener('session-expired', handleSessionExpired);
+    // Use a type-safe event listener for session-expired
+    const sessionExpiredHandler = (event: Event) => {
+      handleSessionExpired(event as CustomEvent);
+    };
+    
+    window.addEventListener('session-expired', sessionExpiredHandler);
     window.addEventListener('storage', handleStorageChange);
     
     return () => {
-      window.removeEventListener('session-expired', handleSessionExpired);
+      window.removeEventListener('session-expired', sessionExpiredHandler);
       window.removeEventListener('storage', handleStorageChange);
     };
   }, [navigate]); // Include navigate in dependencies

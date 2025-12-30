@@ -237,10 +237,6 @@ const ProjectFormPage: React.FC = () => {
         </div>
       )}
 
-      <h1 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
-        {isEditMode ? 'Edit Project' : 'Create New Project'}
-      </h1>
-
       {saveError && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
           <span className="block sm:inline">{saveError}</span>

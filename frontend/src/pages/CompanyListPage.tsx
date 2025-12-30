@@ -98,13 +98,12 @@ const CompanyListPage: React.FC = () => {
         </div>
       )}
 
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Companies</h1>
+      <div className="flex justify-end items-center mb-6">
         <Link
           to="/companies/new"
-          className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md transition-colors"
+          className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2.5 rounded-md transition-colors font-medium shadow-md hover:shadow-lg"
         >
-          Add New Company
+          Create New Company
         </Link>
       </div>
 

@@ -920,75 +920,73 @@ const TaskListPage: React.FC = () => {
 
             {/* Header Section */}
             <div className="mb-6">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
-                    <div>
-                        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-                            {projectId ? 'Project Tasks' : 'All Tasks'}
-                        </h1>
-                        {(monthFilter || yearFilter) && (
-                            <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-sm text-gray-600 dark:text-gray-400">
-                                    Filtered by: 
-                                </span>
-                                <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full text-sm font-medium">
-                                    {monthFilter 
-                                        ? new Date(monthFilter + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-                                        : yearFilter + ' (Year)'}
-                                </span>
-                                <button
-                                    onClick={() => {
-                                        const newParams = new URLSearchParams(searchParams);
-                                        newParams.delete('month');
-                                        newParams.delete('year');
-                                        newParams.delete('projectId');
-                                        setSearchParams(newParams);
-                                        setMonthFilter(null);
-                                        setYearFilter(null);
-                                        setProjectFilter(null);
-                                    }}
-                                    className="text-sm text-red-600 dark:text-red-400 hover:underline font-medium"
-                                >
-                                    Clear filters
-                                </button>
-                            </div>
-                        )}
+                {(monthFilter || yearFilter) && (
+                    <div className="flex items-center gap-2 flex-wrap mb-4">
+                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                            Filtered by: 
+                        </span>
+                        <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full text-sm font-medium">
+                            {monthFilter 
+                                ? new Date(monthFilter + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+                                : yearFilter + ' (Year)'}
+                        </span>
+                        <button
+                            onClick={() => {
+                                const newParams = new URLSearchParams(searchParams);
+                                newParams.delete('month');
+                                newParams.delete('year');
+                                newParams.delete('projectId');
+                                setSearchParams(newParams);
+                                setMonthFilter(null);
+                                setYearFilter(null);
+                                setProjectFilter(null);
+                            }}
+                            className="text-sm text-red-600 dark:text-red-400 hover:underline font-medium"
+                        >
+                            Clear filters
+                        </button>
                     </div>
+                )}
+
+                {/* All Buttons in One Row */}
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+                    {/* Action Buttons Group - Left Side */}
+                    <div className="flex flex-wrap gap-2">
+                        <button
+                            onClick={() => setBillingStatusModalOpen(true)}
+                            className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md transition-colors flex items-center text-sm"
+                        >
+                            <FaCheck className="mr-2" />
+                            Update Billing Status
+                        </button>
+                        <button
+                            onClick={() => setPaymentStatusModalOpen(true)}
+                            className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md transition-colors flex items-center text-sm"
+                        >
+                            <FaCheck className="mr-2" />
+                            Update Payment Status
+                        </button>
+                        <button
+                            onClick={() => setInfoForBillModalOpen(true)}
+                            className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-md transition-colors text-sm"
+                        >
+                            Info For Bill
+                        </button>
+                        <button
+                            onClick={() => setSalModalOpen(true)}
+                            className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-md transition-colors flex items-center text-sm"
+                        >
+                            <FaFilePdf className="mr-2" />
+                            Generate SAL
+                        </button>
+                    </div>
+
+                    {/* Add New Task Button - Right Side */}
                     <button
                         onClick={() => navigate('/tasks/new')}
-                        className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2.5 rounded-md transition-colors font-medium shadow-md hover:shadow-lg"
+                        className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2.5 rounded-md transition-colors font-medium shadow-md hover:shadow-lg flex items-center"
                     >
-                        + Add New Task
-                    </button>
-                </div>
-
-                {/* Action Buttons Group */}
-                <div className="flex flex-wrap gap-2 mb-4">
-                    <button
-                        onClick={() => setBillingStatusModalOpen(true)}
-                        className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md transition-colors flex items-center text-sm"
-                    >
-                        <FaCheck className="mr-2" />
-                        Update Billing Status
-                    </button>
-                    <button
-                        onClick={() => setPaymentStatusModalOpen(true)}
-                        className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md transition-colors flex items-center text-sm"
-                    >
-                        <FaCheck className="mr-2" />
-                        Update Payment Status
-                    </button>
-                    <button
-                        onClick={() => setInfoForBillModalOpen(true)}
-                        className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-md transition-colors text-sm"
-                    >
-                        Info For Bill
-                    </button>
-                    <button
-                        onClick={() => setSalModalOpen(true)}
-                        className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-md transition-colors flex items-center text-sm"
-                    >
-                        <FaFilePdf className="mr-2" />
-                        Generate SAL
+                        Create New Task
                     </button>
                 </div>
             </div>

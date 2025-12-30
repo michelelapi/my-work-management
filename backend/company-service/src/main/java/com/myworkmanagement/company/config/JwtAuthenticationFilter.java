@@ -1,6 +1,8 @@
 package com.myworkmanagement.company.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import jakarta.servlet.FilterChain;
@@ -19,7 +21,9 @@ import javax.crypto.SecretKey;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Component
@@ -84,11 +88,37 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             SecurityContextHolder.getContext().setAuthentication(auth);
             logger.info("Authentication set in SecurityContext");
             
+        } catch (ExpiredJwtException e) {
+            logger.warn("JWT token has expired: " + e.getMessage());
+            SecurityContextHolder.clearContext();
+            // Return 401 Unauthorized for expired tokens
+            handleUnauthorizedResponse(response, "JWT token has expired");
+            return;
         } catch (Exception e) {
             logger.error("Cannot set user authentication: " + e.getMessage(), e);
             SecurityContextHolder.clearContext();
+            // For other JWT errors, also return 401
+            if (e instanceof io.jsonwebtoken.JwtException) {
+                handleUnauthorizedResponse(response, "Invalid JWT token: " + e.getMessage());
+                return;
+            }
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private void handleUnauthorizedResponse(HttpServletResponse response, String message) throws IOException {
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+        
+        Map<String, Object> errorResponse = new HashMap<>();
+        errorResponse.put("status", 401);
+        errorResponse.put("error", "Unauthorized");
+        errorResponse.put("message", message);
+        errorResponse.put("path", "");
+        
+        ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.writeValue(response.getWriter(), errorResponse);
     }
 } 

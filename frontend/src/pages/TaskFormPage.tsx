@@ -216,10 +216,6 @@ const TaskFormPage: React.FC = () => {
                 </div>
             )}
 
-            <h1 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
-                {isEditMode ? 'Edit Task' : 'Create New Task'}
-            </h1>
-
             <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md space-y-4" noValidate>
                 {/* Project Selection */}
                 <div>

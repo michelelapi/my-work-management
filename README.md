@@ -48,6 +48,9 @@ Below are some key screens and features of MyWorkManagement:
 ### Task
 ![Task](docs/screenshots/task.png)
 
+### Task Filter
+![Task](docs/screenshots/task-filter.png)
+
 ### Task Edit
 ![Task Edit](docs/screenshots/task-edit.png)
 

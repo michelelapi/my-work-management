@@ -17,6 +17,8 @@ export interface Task {
     paymentDate?: string;
     invoiceId?: string;
     referencedTaskId?: string;
+    clientId?: number;
+    clientName?: string;
     notes?: string;
     createdAt?: string;
     updatedAt?: string;

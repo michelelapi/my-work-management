@@ -83,10 +83,6 @@ const TaskListPage: React.FC = () => {
     const [sortField, setSortField] = useState<string>('startDate');
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
-    // SAL generation modal state
-    const [salModalOpen, setSalModalOpen] = useState(false);
-    const [salYear, setSalYear] = useState<number>(new Date().getFullYear());
-    const [salMonth, setSalMonth] = useState<number>(new Date().getMonth() + 1);
 
     // Compute info for bill - group tasks by day
     const tasksByDay: Record<string, Task[]> = tasks.reduce((acc, task) => {
@@ -780,26 +776,90 @@ const TaskListPage: React.FC = () => {
         setCurrentPage(0); // Reset to first page when sorting changes
     };
 
-    // Handle SAL PDF generation
+    // Handle SAL PDF generation - uses filtered tasks
     const handleGenerateSal = async () => {
         try {
+            // Check if there are any tasks to generate SAL for
+            if (allFilteredTasks.length === 0 && tasks.length === 0) {
+                setError('No tasks available to generate SAL PDF. Please filter tasks first.');
+                return;
+            }
+
+            // Determine year and month from filters or current date
+            let year: number;
+            let month: number;
+            
+            if (monthFilter) {
+                // Extract year and month from monthFilter (format: YYYY-MM)
+                const [filterYear, filterMonth] = monthFilter.split('-');
+                year = parseInt(filterYear, 10);
+                month = parseInt(filterMonth, 10);
+                
+                if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
+                    setError('Invalid date filter. Please use a valid month filter (YYYY-MM) or set a year filter.');
+                    return;
+                }
+            } else if (yearFilter) {
+                // Use year filter and current month
+                year = parseInt(yearFilter, 10);
+                month = new Date().getMonth() + 1;
+                
+                if (isNaN(year)) {
+                    setError('Invalid year filter. Please use a valid year.');
+                    return;
+                }
+            } else {
+                // Try to extract year/month from the filtered tasks
+                const tasksWithDates = (allFilteredTasks.length > 0 ? allFilteredTasks : tasks)
+                    .filter(t => t.startDate)
+                    .map(t => {
+                        const date = new Date(t.startDate);
+                        return { year: date.getFullYear(), month: date.getMonth() + 1 };
+                    });
+                
+                if (tasksWithDates.length > 0) {
+                    // Use the most common year/month from tasks, or the first task's date
+                    const firstTask = tasksWithDates[0];
+                    year = firstTask.year;
+                    month = firstTask.month;
+                } else {
+                    // Fallback to current date
+                    const now = new Date();
+                    year = now.getFullYear();
+                    month = now.getMonth() + 1;
+                }
+            }
+            
             const blob = await taskService.generateSalPdf(
-                salYear,
-                salMonth,
+                year,
+                month,
                 projectFilter || (projectId ? parseInt(projectId) : undefined)
             );
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `SAL_${salYear}_${String(salMonth).padStart(2, '0')}.pdf`;
+            a.download = `SAL_${year}_${String(month).padStart(2, '0')}.pdf`;
             document.body.appendChild(a);
             a.click();
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
-            setSalModalOpen(false);
-        } catch (err) {
-            setError('Failed to generate SAL PDF. Please try again later.');
+        } catch (err: any) {
             console.error('Error generating SAL PDF:', err);
+            
+            // Provide more specific error messages
+            if (err.response) {
+                if (err.response.status === 400) {
+                    setError('No tasks found for the selected period. Please check your filters and ensure there are tasks for the selected year/month.');
+                } else if (err.response.status === 401) {
+                    setError('Unauthorized. Please log in again.');
+                } else if (err.response.status === 500) {
+                    setError('Server error while generating SAL PDF. Please try again later.');
+                } else {
+                    setError(`Failed to generate SAL PDF: ${err.response.statusText || 'Unknown error'}`);
+                }
+            } else {
+                setError('Failed to generate SAL PDF. Please check your connection and try again.');
+            }
         }
     };
 
@@ -973,7 +1033,7 @@ const TaskListPage: React.FC = () => {
                             Info For Bill
                         </button>
                         <button
-                            onClick={() => setSalModalOpen(true)}
+                            onClick={handleGenerateSal}
                             className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-md transition-colors flex items-center text-sm"
                         >
                             <FaFilePdf className="mr-2" />
@@ -1249,60 +1309,6 @@ const TaskListPage: React.FC = () => {
                 </div>
             )}
 
-            {/* SAL Generation Modal */}
-            {salModalOpen && (
-                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
-                    <div className="relative p-5 border w-96 shadow-lg rounded-md bg-white dark:bg-gray-800">
-                        <div className="mt-3 text-center">
-                            <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white mt-2 mb-4">
-                                Generate SAL for Dedagroup
-                            </h3>
-                            <div className="flex flex-col space-y-4">
-                                <div>
-                                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Year</label>
-                                    <input
-                                        type="number"
-                                        value={salYear}
-                                        onChange={(e) => setSalYear(parseInt(e.target.value))}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                                        min="2020"
-                                        max="2100"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Month</label>
-                                    <select
-                                        value={salMonth}
-                                        onChange={(e) => setSalMonth(parseInt(e.target.value))}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                                    >
-                                        {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
-                                            <option key={month} value={month}>
-                                                {new Date(2000, month - 1, 1).toLocaleString('default', { month: 'long' })}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-                            <div className="flex justify-center space-x-4 mt-6">
-                                <button
-                                    onClick={() => setSalModalOpen(false)}
-                                    className="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleGenerateSal}
-                                    className="px-4 py-2 bg-purple-600 text-white text-base font-medium rounded-md shadow-sm hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                >
-                                    Generate PDF
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
             {/* Filter Section */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 mb-4">
                 <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
@@ -1475,8 +1481,8 @@ const TaskListPage: React.FC = () => {
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/12 cursor-pointer" onClick={() => handleSort('ticketId')}>
                                     Task ID {sortField === 'ticketId' && (sortDirection === 'asc' ? '▲' : '▼')}
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-4/12 cursor-pointer" onClick={() => handleSort('description')}>
-                                    Description {sortField === 'description' && (sortDirection === 'asc' ? '▲' : '▼')}
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-4/12 cursor-pointer" onClick={() => handleSort('title')}>
+                                    Title {sortField === 'title' && (sortDirection === 'asc' ? '▲' : '▼')}
                                 </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-2/12">
                                     Project
@@ -1507,9 +1513,9 @@ const TaskListPage: React.FC = () => {
                                     <td className="px-6 py-4 w-4/12 max-w-0">
                                         <div 
                                             className="text-sm text-gray-900 dark:text-white truncate"
-                                            title={task.description}
+                                            title={task.title}
                                         >
-                                            {task.description}
+                                            {task.title}
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 break-words w-2/12">

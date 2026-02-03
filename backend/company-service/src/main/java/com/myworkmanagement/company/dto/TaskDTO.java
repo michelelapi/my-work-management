@@ -72,6 +72,12 @@ public class TaskDTO {
     @Schema(description = "ID of the referenced task", example = "TSK-2024-ABC123")
     private String referencedTaskId;
 
+    @Schema(description = "ID of the client for this task", example = "1")
+    private Long clientId;
+
+    @Schema(description = "Name of the client for this task", example = "Acme Corporation")
+    private String clientName;
+
     @Schema(description = "Additional notes about the task", example = "Completed ahead of schedule")
     private String notes;
 

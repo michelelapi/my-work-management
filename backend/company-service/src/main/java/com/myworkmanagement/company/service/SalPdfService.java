@@ -19,6 +19,8 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
@@ -333,109 +335,206 @@ public class SalPdfService {
         contentStream.showText("Importo+IVA");
         contentStream.endText();
 
-        // Table rows
+        // Group tasks by client
+        Map<String, List<TaskDTO>> tasksByClient = tasks.stream()
+                .collect(Collectors.groupingBy(
+                    task -> task.getClientName() != null && !task.getClientName().trim().isEmpty() 
+                        ? task.getClientName() 
+                        : "No Client"
+                ));
+
+        // Table rows - iterate through client groups
         BigDecimal totalHours = BigDecimal.ZERO;
         BigDecimal totalAmount = BigDecimal.ZERO;
         BigDecimal totalAmountWithVat = BigDecimal.ZERO;
 
-        for (TaskDTO task : tasks) {
-            // Prepare description to calculate row height (using title field)
-            String description = task.getTitle() != null ? task.getTitle() : task.getDescription();
-            description = sanitizeTextForPdf(description);
-            PDType1Font descFont = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
-            float descFontSize = 9;
-            java.util.List<String> descLines = wrapText(description, descMaxWidth, descFont, descFontSize);
+        // Iterate through each client group
+        for (Map.Entry<String, List<TaskDTO>> clientGroup : tasksByClient.entrySet()) {
+            String clientName = clientGroup.getKey();
+            List<TaskDTO> clientTasks = clientGroup.getValue();
             
-            // Calculate row height based on description lines
-            float rowHeight = Math.max(20, descLines.size() * 12);
-            
-            // Check if we need a new page (account for row height + totals space)
-            yPosition -= 20;
-            if (yPosition - rowHeight < 150) { // Leave space for totals and signature
-                // New page if needed
-                contentStream.close();
-                PDPage newPage = new PDPage();
-                document.addPage(newPage);
-                contentStream = new PDPageContentStream(document, newPage);
-                yPosition = pageHeight - margin - 40;
-                // Redraw table header on new page
+            // Draw client header (if not "No Client" or if it's the first group)
+            if (!"No Client".equals(clientName)) {
+                // Check if we need a new page before client header
+                if (yPosition < 200) {
+                    contentStream.close();
+                    PDPage newPage = new PDPage();
+                    document.addPage(newPage);
+                    contentStream = new PDPageContentStream(document, newPage);
+                    yPosition = pageHeight - margin - 40;
+                }
+                
+                yPosition -= 25;
                 contentStream.beginText();
-                contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 9);
-                contentStream.newLineAtOffset(col1X, yPosition);
-                contentStream.showText("N° Task");
+                contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 11);
+                contentStream.newLineAtOffset(margin, yPosition);
+                contentStream.showText("Cliente: " + sanitizeTextForPdf(clientName));
                 contentStream.endText();
+                yPosition -= 15;
+                
+                // Draw a line under client header
+                contentStream.setLineWidth(0.5f);
+                contentStream.moveTo(margin, yPosition);
+                contentStream.lineTo(pageWidth - margin, yPosition);
+                contentStream.stroke();
+                yPosition -= 10;
+            }
+            
+            // Client subtotals
+            BigDecimal clientHours = BigDecimal.ZERO;
+            BigDecimal clientAmount = BigDecimal.ZERO;
+            BigDecimal clientAmountWithVat = BigDecimal.ZERO;
+
+            for (TaskDTO task : clientTasks) {
+                // Prepare description to calculate row height (using title field)
+                String description = task.getTitle() != null ? task.getTitle() : task.getDescription();
+                description = sanitizeTextForPdf(description);
+                PDType1Font descFont = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
+                float descFontSize = 9;
+                java.util.List<String> descLines = wrapText(description, descMaxWidth, descFont, descFontSize);
+                
+                // Calculate row height based on description lines
+                float rowHeight = Math.max(20, descLines.size() * 12);
+                
+                // Check if we need a new page (account for row height + totals space)
+                yPosition -= 20;
+                if (yPosition - rowHeight < 150) { // Leave space for totals and signature
+                    // New page if needed
+                    contentStream.close();
+                    PDPage newPage = new PDPage();
+                    document.addPage(newPage);
+                    contentStream = new PDPageContentStream(document, newPage);
+                    yPosition = pageHeight - margin - 40;
+                    // Redraw table header on new page
+                    contentStream.beginText();
+                    contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 9);
+                    contentStream.newLineAtOffset(col1X, yPosition);
+                    contentStream.showText("N° Task");
+                    contentStream.endText();
+                    contentStream.beginText();
+                    contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 9);
+                    contentStream.newLineAtOffset(col2X, yPosition);
+                    contentStream.showText("Descrizione");
+                    contentStream.endText();
+                    contentStream.beginText();
+                    contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 9);
+                    contentStream.newLineAtOffset(col3X, yPosition);
+                    contentStream.showText("Ore");
+                    contentStream.endText();
+                    contentStream.beginText();
+                    contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 9);
+                    contentStream.newLineAtOffset(col4X, yPosition);
+                    contentStream.showText("Importo");
+                    contentStream.endText();
+                    contentStream.beginText();
+                    contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 9);
+                    contentStream.newLineAtOffset(col5X, yPosition);
+                    contentStream.showText("Importo+IVA");
+                    contentStream.endText();
+                    yPosition -= 20;
+                }
+
+                // Task number
+                float rowStartY = yPosition;
+                contentStream.beginText();
+                contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 9);
+                contentStream.newLineAtOffset(col1X, yPosition);
+                contentStream.showText(sanitizeTextForPdf(task.getTicketId()));
+                contentStream.endText();
+
+                // Description (wrap if needed)
+                float descY = yPosition;
+                for (String line : descLines) {
+                    contentStream.beginText();
+                    contentStream.setFont(descFont, descFontSize);
+                    contentStream.newLineAtOffset(col2X, descY);
+                    contentStream.showText(line);
+                    contentStream.endText();
+                    descY -= 12; // Line spacing
+                }
+                
+                yPosition -= rowHeight;
+
+                // Hours (aligned to top of row)
+                BigDecimal hours = task.getHoursWorked() != null ? task.getHoursWorked() : BigDecimal.ZERO;
+                contentStream.beginText();
+                contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 9);
+                contentStream.newLineAtOffset(col3X, rowStartY);
+                contentStream.showText(formatItalianNumber(hours));
+                contentStream.endText();
+
+                // Amount (hours * rate) - aligned to top of row
+                BigDecimal rate = task.getRateUsed() != null ? task.getRateUsed() : BigDecimal.ZERO;
+                BigDecimal amount = hours.multiply(rate);
+                contentStream.beginText();
+                contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 9);
+                contentStream.newLineAtOffset(col4X, rowStartY);
+                contentStream.showText(formatItalianNumber(amount));
+                contentStream.endText();
+
+                // Amount with VAT - aligned to top of row
+                BigDecimal amountWithVat = amount.multiply(BigDecimal.valueOf(1 + VAT_RATE));
+                contentStream.beginText();
+                contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 9);
+                contentStream.newLineAtOffset(col5X, rowStartY);
+                contentStream.showText(formatItalianNumber(amountWithVat));
+                contentStream.endText();
+
+                // Add to client subtotals
+                clientHours = clientHours.add(hours);
+                clientAmount = clientAmount.add(amount);
+                clientAmountWithVat = clientAmountWithVat.add(amountWithVat);
+                
+                // Add to overall totals
+                totalHours = totalHours.add(hours);
+                totalAmount = totalAmount.add(amount);
+                totalAmountWithVat = totalAmountWithVat.add(amountWithVat);
+            }
+            
+            // Display client subtotals (if more than one client group or if client name is not "No Client")
+            if (tasksByClient.size() > 1 || !"No Client".equals(clientName)) {
+                // Check if we need a new page before subtotals
+                if (yPosition < 100) {
+                    contentStream.close();
+                    PDPage newPage = new PDPage();
+                    document.addPage(newPage);
+                    contentStream = new PDPageContentStream(document, newPage);
+                    yPosition = pageHeight - margin - 40;
+                }
+                
+                yPosition -= 15;
+                contentStream.setLineWidth(0.5f);
+                contentStream.moveTo(margin, yPosition);
+                contentStream.lineTo(pageWidth - margin, yPosition);
+                contentStream.stroke();
+                
+                yPosition -= 15;
                 contentStream.beginText();
                 contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 9);
                 contentStream.newLineAtOffset(col2X, yPosition);
-                contentStream.showText("Descrizione");
+                contentStream.showText("Subtotale " + (!"No Client".equals(clientName) ? sanitizeTextForPdf(clientName) : ""));
                 contentStream.endText();
+                
                 contentStream.beginText();
                 contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 9);
                 contentStream.newLineAtOffset(col3X, yPosition);
-                contentStream.showText("Ore");
+                contentStream.showText(formatItalianNumber(clientHours));
                 contentStream.endText();
+                
                 contentStream.beginText();
                 contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 9);
                 contentStream.newLineAtOffset(col4X, yPosition);
-                contentStream.showText("Importo");
+                contentStream.showText(formatItalianNumber(clientAmount));
                 contentStream.endText();
+                
                 contentStream.beginText();
                 contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 9);
                 contentStream.newLineAtOffset(col5X, yPosition);
-                contentStream.showText("Importo+IVA");
+                contentStream.showText(formatItalianNumber(clientAmountWithVat));
                 contentStream.endText();
-                yPosition -= 20;
+                
+                yPosition -= 20; // Extra space after subtotal
             }
-
-            // Task number
-            float rowStartY = yPosition;
-            contentStream.beginText();
-            contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 9);
-            contentStream.newLineAtOffset(col1X, yPosition);
-            contentStream.showText(sanitizeTextForPdf(task.getTicketId()));
-            contentStream.endText();
-
-            // Description (wrap if needed)
-            float descY = yPosition;
-            for (String line : descLines) {
-                contentStream.beginText();
-                contentStream.setFont(descFont, descFontSize);
-                contentStream.newLineAtOffset(col2X, descY);
-                contentStream.showText(line);
-                contentStream.endText();
-                descY -= 12; // Line spacing
-            }
-            
-            yPosition -= rowHeight;
-
-            // Hours (aligned to top of row)
-            BigDecimal hours = task.getHoursWorked() != null ? task.getHoursWorked() : BigDecimal.ZERO;
-            contentStream.beginText();
-            contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 9);
-            contentStream.newLineAtOffset(col3X, rowStartY);
-            contentStream.showText(formatItalianNumber(hours));
-            contentStream.endText();
-
-            // Amount (hours * rate) - aligned to top of row
-            BigDecimal rate = task.getRateUsed() != null ? task.getRateUsed() : BigDecimal.ZERO;
-            BigDecimal amount = hours.multiply(rate);
-            contentStream.beginText();
-            contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 9);
-            contentStream.newLineAtOffset(col4X, rowStartY);
-            contentStream.showText(formatItalianNumber(amount));
-            contentStream.endText();
-
-            // Amount with VAT - aligned to top of row
-            BigDecimal amountWithVat = amount.multiply(BigDecimal.valueOf(1 + VAT_RATE));
-            contentStream.beginText();
-            contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 9);
-            contentStream.newLineAtOffset(col5X, rowStartY);
-            contentStream.showText(formatItalianNumber(amountWithVat));
-            contentStream.endText();
-
-            totalHours = totalHours.add(hours);
-            totalAmount = totalAmount.add(amount);
-            totalAmountWithVat = totalAmountWithVat.add(amountWithVat);
         }
 
         // Totals row

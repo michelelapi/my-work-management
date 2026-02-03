@@ -3,11 +3,13 @@ package com.myworkmanagement.company.service.impl;
 import com.myworkmanagement.company.dto.TaskBillingStatusUpdateDTO;
 import com.myworkmanagement.company.dto.TaskDTO;
 import com.myworkmanagement.company.dto.TaskPaymentStatusUpdateDTO;
+import com.myworkmanagement.company.entity.Client;
 import com.myworkmanagement.company.entity.Project;
 import com.myworkmanagement.company.entity.Task;
 import com.myworkmanagement.company.exception.ResourceNotFoundException;
 import com.myworkmanagement.company.exception.TaskBillingStatusException;
 import com.myworkmanagement.company.exception.TaskPaymentStatusException;
+import com.myworkmanagement.company.repository.ClientRepository;
 import com.myworkmanagement.company.repository.ProjectRepository;
 import com.myworkmanagement.company.repository.TaskRepository;
 import com.myworkmanagement.company.service.GoogleSheetsService;
@@ -35,6 +37,7 @@ public class TaskServiceImpl implements TaskService {
 
     private final TaskRepository taskRepository;
     private final ProjectRepository projectRepository;
+    private final ClientRepository clientRepository;
     private final GoogleSheetsService googleSheetsService;
     private static final Logger logger = LoggerFactory.getLogger(TaskServiceImpl.class);
     private static final SecureRandom random = new SecureRandom();
@@ -66,6 +69,13 @@ public class TaskServiceImpl implements TaskService {
             taskDTO.setCurrency(currency);
         }
 
+        // Fetch client if clientId is provided
+        Client client = null;
+        if (taskDTO.getClientId() != null) {
+            client = clientRepository.findByIdAndProjectId(taskDTO.getClientId(), projectId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Client not found with id: " + taskDTO.getClientId() + " for project: " + projectId));
+        }
+
         Task task = Task.builder()
                 .project(project)
                 .title(taskDTO.getTitle())
@@ -83,6 +93,7 @@ public class TaskServiceImpl implements TaskService {
                 .paymentDate(taskDTO.getPaymentDate())
                 .invoiceId(taskDTO.getInvoiceId())
                 .referencedTaskId(taskDTO.getReferencedTaskId())
+                .client(client)
                 .notes(taskDTO.getNotes())
                 .userEmail(taskDTO.getUserEmail())
                 .build();
@@ -122,6 +133,16 @@ public class TaskServiceImpl implements TaskService {
         task.setPaymentDate(taskDTO.getPaymentDate());
         task.setInvoiceId(taskDTO.getInvoiceId());
         task.setReferencedTaskId(taskDTO.getReferencedTaskId());
+        
+        // Update client relationship
+        if (taskDTO.getClientId() != null) {
+            Client client = clientRepository.findByIdAndProjectId(taskDTO.getClientId(), taskDTO.getProjectId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Client not found with id: " + taskDTO.getClientId() + " for project: " + taskDTO.getProjectId()));
+            task.setClient(client);
+        } else {
+            task.setClient(null);
+        }
+        
         task.setNotes(taskDTO.getNotes());
         task.setUserEmail(taskDTO.getUserEmail());
 
@@ -487,7 +508,7 @@ public class TaskServiceImpl implements TaskService {
     }
 
     private TaskDTO convertToDTO(Task task) {
-        return TaskDTO.builder()
+        TaskDTO.TaskDTOBuilder builder = TaskDTO.builder()
                 .id(task.getId())
                 .projectId(task.getProject().getId())
                 .projectName(task.getProject().getName())
@@ -509,8 +530,15 @@ public class TaskServiceImpl implements TaskService {
                 .notes(task.getNotes())
                 .userEmail(task.getUserEmail())
                 .createdAt(task.getCreatedAt())
-                .updatedAt(task.getUpdatedAt())
-                .build();
+                .updatedAt(task.getUpdatedAt());
+        
+        // Map client relationship
+        if (task.getClient() != null) {
+            builder.clientId(task.getClient().getId())
+                   .clientName(task.getClient().getName());
+        }
+        
+        return builder.build();
     }
 
     private List<Object> mapTaskToSheetRow(Task task) {

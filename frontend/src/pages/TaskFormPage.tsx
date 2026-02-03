@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Task } from '../types/task';
 import { Project } from '../types/project';
+import { Client } from '../types/client';
 import { taskService } from '../services/taskService';
 import projectService from '../services/projectService';
+import clientService from '../services/clientService';
 
 interface ValidationErrors {
     projectId?: string;
@@ -31,6 +33,7 @@ const TaskFormPage: React.FC = () => {
         currency: 'EUR'
     });
     const [projects, setProjects] = useState<Project[]>([]);
+    const [clients, setClients] = useState<Client[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
@@ -51,6 +54,11 @@ const TaskFormPage: React.FC = () => {
                 if (isEditMode && taskId) {
                     const fetchedTask = await taskService.getTask(parseInt(taskId));
                     setTask(fetchedTask);
+                    // Fetch clients for the project
+                    if (fetchedTask.projectId) {
+                        const fetchedClients = await clientService.getAllClientsByProjectId(fetchedTask.projectId);
+                        setClients(fetchedClients);
+                    }
                 } else if (urlProjectId) {
                     const projectIdNum = parseInt(urlProjectId);
                     const foundProject = fetchedProjects.find(p => p.id === projectIdNum);
@@ -59,6 +67,9 @@ const TaskFormPage: React.FC = () => {
                         projectId: projectIdNum,
                         rateUsed: foundProject?.hourlyRate
                     }));
+                    // Fetch clients for the project
+                    const fetchedClients = await clientService.getAllClientsByProjectId(projectIdNum);
+                    setClients(fetchedClients);
                 }
             } catch (err) {
                 console.error('Error fetching data for task form:', err);
@@ -70,6 +81,25 @@ const TaskFormPage: React.FC = () => {
 
         fetchData();
     }, [isEditMode, urlProjectId, taskId]);
+
+    // Fetch clients when project changes
+    useEffect(() => {
+        const fetchClients = async () => {
+            if (task.projectId) {
+                try {
+                    const fetchedClients = await clientService.getAllClientsByProjectId(task.projectId);
+                    setClients(fetchedClients);
+                } catch (err) {
+                    console.error('Error fetching clients:', err);
+                    setClients([]);
+                }
+            } else {
+                setClients([]);
+            }
+        };
+
+        fetchClients();
+    }, [task.projectId]);
 
     const validateForm = (): boolean => {
         const errors: ValidationErrors = {};
@@ -112,7 +142,15 @@ const TaskFormPage: React.FC = () => {
                 ...prev,
                 projectId: projectIdNum,
                 // Only set rateUsed if the user hasn't already set it or if it's empty-
-                rateUsed: foundProject?.hourlyRate
+                rateUsed: foundProject?.hourlyRate,
+                // Clear clientId when project changes
+                clientId: undefined
+            }));
+        } else if (name === 'clientId') {
+            const clientIdNum = value ? parseInt(value) : undefined;
+            setTask(prev => ({
+                ...prev,
+                clientId: clientIdNum
             }));
         } else {
             setTask(prev => ({
@@ -308,6 +346,33 @@ const TaskFormPage: React.FC = () => {
                         onChange={handleChange}
                         className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:border-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
                     />
+                </div>
+
+                {/* Client */}
+                <div>
+                    <label htmlFor="clientId" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Client
+                    </label>
+                    <select
+                        id="clientId"
+                        name="clientId"
+                        value={task.clientId || ''}
+                        onChange={handleChange}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
+                        disabled={!task.projectId}
+                    >
+                        <option value="">-- Select a Client --</option>
+                        {clients.map(client => (
+                            <option key={client.id} value={client.id}>
+                                {client.name}
+                            </option>
+                        ))}
+                    </select>
+                    {!task.projectId && (
+                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                            Please select a project first
+                        </p>
+                    )}
                 </div>
 
                 {/* Start Date */}

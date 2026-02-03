@@ -72,6 +72,10 @@ public class Task {
     @Column(name = "referenced_task_id")
     private String referencedTaskId;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "client_id")
+    private Client client;
+
     @Column(columnDefinition = "TEXT")
     private String notes;
 

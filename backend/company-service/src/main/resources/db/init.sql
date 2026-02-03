@@ -136,6 +136,7 @@ CREATE TABLE public.tasks (
 	payment_date date NULL,
 	invoice_id varchar(100) NULL,
 	referenced_task_id varchar(255) NULL,
+	client varchar(255) NULL,
 	notes text NULL,
 	created_at timestamp NULL DEFAULT CURRENT_TIMESTAMP,
 	updated_at timestamp NULL DEFAULT CURRENT_TIMESTAMP,

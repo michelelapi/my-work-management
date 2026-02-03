@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Project, ProjectStatus } from '../types/project';
 import { Company } from '../types/company'; // Import Company type for company selection
+import { Client } from '../types/client';
 import projectService from '../services/projectService';
 import companyService from '../services/companyService'; // Import company service for fetching companies
+import clientService from '../services/clientService';
 
 interface ValidationErrors {
   companyId?: string;
@@ -26,12 +28,24 @@ const ProjectFormPage: React.FC = () => {
     status: ProjectStatus.ACTIVE,
   });
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [deleteClientModalOpen, setDeleteClientModalOpen] = useState(false);
+  const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [showClientForm, setShowClientForm] = useState(false);
+  const [clientFormData, setClientFormData] = useState<Client>({
+    projectId: 0,
+    name: '',
+    description: '',
+    contactEmail: '',
+    contactPhone: '',
+  });
 
   const isEditMode = !!projectId;
 
@@ -46,8 +60,13 @@ const ProjectFormPage: React.FC = () => {
         setCompanies(fetchedCompanies);
 
         if (isEditMode && companyId && projectId) {
-          const fetchedProject = await projectService.getProjectById(parseInt(companyId, 10), parseInt(projectId, 10));
+          const projectIdNum = parseInt(projectId, 10);
+          const [fetchedProject, fetchedClients] = await Promise.all([
+            projectService.getProjectById(parseInt(companyId, 10), projectIdNum),
+            clientService.getAllClientsByProjectId(projectIdNum)
+          ]);
           setProject(fetchedProject);
+          setClients(fetchedClients);
         } else if (companyId) {
           setProject(prev => ({ ...prev, companyId: parseInt(companyId, 10) }));
         }
@@ -177,7 +196,12 @@ const ProjectFormPage: React.FC = () => {
       if (isEditMode && projectId) {
         await projectService.updateProject(project.companyId, parseInt(projectId, 10), project);
       } else {
-        await projectService.createProject(project.companyId, project);
+        const createdProject = await projectService.createProject(project.companyId, project);
+        // After creating, navigate to edit mode so clients can be managed
+        if (createdProject.id) {
+          navigate(`/companies/${project.companyId}/projects/${createdProject.id}/edit`);
+          return;
+        }
       }
       navigate(`/companies/${project.companyId}`);
     } catch (err) {
@@ -186,6 +210,108 @@ const ProjectFormPage: React.FC = () => {
     } finally {
       setIsSaving(false);
       setShowConfirmModal(false);
+    }
+  };
+
+  const handleDeleteClient = async (clientId: number) => {
+    if (!projectId) return;
+
+    try {
+      await clientService.deleteClient(parseInt(projectId, 10), clientId);
+      setClients(clients.filter(client => client.id !== clientId));
+      setDeleteClientModalOpen(false);
+      setClientToDelete(null);
+    } catch (err) {
+      console.error('Error deleting client:', err);
+      setSaveError('Failed to delete client');
+    }
+  };
+
+  const openDeleteClientModal = (client: Client) => {
+    setClientToDelete(client);
+    setDeleteClientModalOpen(true);
+  };
+
+  const closeDeleteClientModal = () => {
+    setDeleteClientModalOpen(false);
+    setClientToDelete(null);
+  };
+
+  const handleEditClient = (client: Client) => {
+    setEditingClient(client);
+    setClientFormData({
+      projectId: client.projectId,
+      name: client.name,
+      description: client.description || '',
+      contactEmail: client.contactEmail || '',
+      contactPhone: client.contactPhone || '',
+    });
+    setShowClientForm(true);
+  };
+
+  const handleNewClient = () => {
+    if (!projectId) return;
+    setEditingClient(null);
+    setClientFormData({
+      projectId: parseInt(projectId, 10),
+      name: '',
+      description: '',
+      contactEmail: '',
+      contactPhone: '',
+    });
+    setShowClientForm(true);
+  };
+
+  const handleClientFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    e.stopPropagation(); // Prevent event bubbling
+    if (!projectId) return;
+
+    try {
+      if (editingClient) {
+        const updated = await clientService.updateClient(
+          parseInt(projectId, 10),
+          editingClient.id!,
+          clientFormData
+        );
+        setClients(clients.map(c => c.id === updated.id ? updated : c));
+      } else {
+        const created = await clientService.createClient(
+          parseInt(projectId, 10),
+          clientFormData
+        );
+        setClients([...clients, created]);
+      }
+      // Close the modal and reset form, but stay on the same page
+      setShowClientForm(false);
+      setEditingClient(null);
+      setClientFormData({
+        projectId: parseInt(projectId, 10),
+        name: '',
+        description: '',
+        contactEmail: '',
+        contactPhone: '',
+      });
+      // Clear any previous errors
+      setSaveError(null);
+    } catch (err) {
+      console.error('Error saving client:', err);
+      setSaveError(`Failed to save client: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      // Don't close the modal on error so user can fix and retry
+    }
+  };
+
+  const handleCancelClientForm = () => {
+    setShowClientForm(false);
+    setEditingClient(null);
+    if (projectId) {
+      setClientFormData({
+        projectId: parseInt(projectId, 10),
+        name: '',
+        description: '',
+        contactEmail: '',
+        contactPhone: '',
+      });
     }
   };
 
@@ -458,6 +584,80 @@ const ProjectFormPage: React.FC = () => {
 
         </div>
 
+        {/* Clients Section - Only show in edit mode */}
+        {isEditMode && projectId && (
+          <div className="mt-6 border-t border-gray-200 dark:border-gray-700 pt-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Clients</h3>
+              <button
+                type="button"
+                onClick={handleNewClient}
+                className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md transition-colors text-sm"
+              >
+                Add Client
+              </button>
+            </div>
+
+            {clients.length === 0 ? (
+              <div className="text-center text-gray-500 dark:text-gray-400 py-4">
+                No clients found. Add your first client!
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                  <thead className="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Name</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Description</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Contact</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                    {clients.map((client) => (
+                      <tr key={client.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">
+                            {client.name}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="text-sm text-gray-500 dark:text-gray-300">
+                            {client.description || '-'}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="text-sm text-gray-500 dark:text-gray-300">
+                            {client.contactEmail && <div>{client.contactEmail}</div>}
+                            {client.contactPhone && <div>{client.contactPhone}</div>}
+                            {!client.contactEmail && !client.contactPhone && '-'}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
+                          <button
+                            type="button"
+                            onClick={() => handleEditClient(client)}
+                            className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-4"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openDeleteClientModal(client)}
+                            className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Submit Button */}
         <div className="flex justify-end space-x-4">
           <button
@@ -476,6 +676,136 @@ const ProjectFormPage: React.FC = () => {
           </button>
         </div>
       </form>
+
+      {/* Delete Client Confirmation Modal - Outside the form */}
+      {deleteClientModalOpen && clientToDelete && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
+          <div className="relative p-5 border w-96 shadow-lg rounded-md bg-white dark:bg-gray-800">
+            <div className="mt-3 text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900">
+                <svg className="h-6 w-6 text-red-600 dark:text-red-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </div>
+              <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white mt-2">Delete Client</h3>
+              <div className="mt-2 px-7 py-3">
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Are you sure you want to delete the client "{clientToDelete.name}"? This action cannot be undone.
+                </p>
+              </div>
+              <div className="flex justify-center space-x-4 mt-4">
+                <button
+                  type="button"
+                  onClick={closeDeleteClientModal}
+                  className="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteClient(clientToDelete.id!)}
+                  className="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Client Form Modal - Outside the form */}
+      {showClientForm && (
+        <div 
+          className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50"
+          onClick={(e) => {
+            // Close modal if clicking on backdrop
+            if (e.target === e.currentTarget) {
+              handleCancelClientForm();
+            }
+          }}
+        >
+          <div 
+            className="relative p-5 border w-full max-w-md shadow-lg rounded-md bg-white dark:bg-gray-800 m-4"
+            onClick={(e) => e.stopPropagation()} // Prevent backdrop click from closing
+          >
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+              {editingClient ? 'Edit Client' : 'Add New Client'}
+            </h3>
+            {saveError && saveError.includes('client') && (
+              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+                <span className="block sm:inline">{saveError}</span>
+              </div>
+            )}
+            <form onSubmit={handleClientFormSubmit} className="space-y-4" noValidate>
+              <div>
+                <label htmlFor="clientName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  id="clientName"
+                  required
+                  value={clientFormData.name}
+                  onChange={(e) => setClientFormData({ ...clientFormData, name: e.target.value })}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
+                />
+              </div>
+              <div>
+                <label htmlFor="clientDescription" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Description
+                </label>
+                <textarea
+                  id="clientDescription"
+                  rows={3}
+                  value={clientFormData.description}
+                  onChange={(e) => setClientFormData({ ...clientFormData, description: e.target.value })}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
+                />
+              </div>
+              <div>
+                <label htmlFor="clientEmail" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Contact Email
+                </label>
+                <input
+                  type="email"
+                  id="clientEmail"
+                  value={clientFormData.contactEmail}
+                  onChange={(e) => setClientFormData({ ...clientFormData, contactEmail: e.target.value })}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
+                />
+              </div>
+              <div>
+                <label htmlFor="clientPhone" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Contact Phone
+                </label>
+                <input
+                  type="tel"
+                  id="clientPhone"
+                  value={clientFormData.contactPhone}
+                  onChange={(e) => setClientFormData({ ...clientFormData, contactPhone: e.target.value })}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
+                />
+              </div>
+              <div className="flex justify-end space-x-4 mt-4">
+                <button
+                  type="button"
+                  onClick={handleCancelClientForm}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  {editingClient ? 'Update' : 'Create'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

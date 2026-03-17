@@ -9,6 +9,12 @@ import { FaPen } from "@react-icons/all-files/fa/FaPen"
 import { FaTrash } from "@react-icons/all-files/fa/FaTrash"
 import { FaCheck } from "@react-icons/all-files/fa/FaCheck"
 import { FaFilePdf } from "@react-icons/all-files/fa/FaFilePdf"
+import ProjectSummary from '../components/ProjectSummary';
+import TaskFilters from '../components/TaskFilters';
+import TaskActionButtons from '../components/TaskActionButtons';
+import BillingStatusModal from '../components/BillingStatusModal';
+import PaymentStatusModal from '../components/PaymentStatusModal';
+import InfoForBillModal from '../components/InfoForBillModal';
 
 // Helper function to format numbers with thousands separators
 const formatNumber = (value: number, decimals: number = 2): string => {
@@ -97,42 +103,6 @@ const TaskListPage: React.FC = () => {
     const taskIdsString = tasks.map(task => task.ticketId).filter(id => id).join(', ');
     const totalAmount = tasks.reduce((sum, task) => sum + (task.hoursWorked * (task.rateUsed ?? 0)), 0);
     const totalHours = tasks.reduce((sum, task) => sum + (task.hoursWorked || 0), 0);
-
-    // Calculate project summaries - group tasks by project and calculate totals
-    // Use allFilteredTasks to show summary for all filtered tasks, not just current page
-    const projectSummaries = allFilteredTasks.reduce((acc, task) => {
-        const projectName = task.projectName || 'Unknown Project';
-        const projectId = task.projectId || 0;
-        const key = `${projectId}-${projectName}`;
-        
-        if (!acc[key]) {
-            acc[key] = {
-                projectId,
-                projectName,
-                totalHours: 0,
-                totalAmount: 0,
-                currency: task.currency || 'EUR',
-                taskCount: 0
-            };
-        }
-        
-        acc[key].totalHours += task.hoursWorked || 0;
-        acc[key].totalAmount += (task.hoursWorked || 0) * (task.rateUsed || 0);
-        acc[key].taskCount += 1;
-        
-        return acc;
-    }, {} as Record<string, {
-        projectId: number;
-        projectName: string;
-        totalHours: number;
-        totalAmount: number;
-        currency: string;
-        taskCount: number;
-    }>);
-
-    const projectSummaryArray = Object.values(projectSummaries).sort((a, b) => 
-        b.totalAmount - a.totalAmount // Sort by total amount descending
-    );
 
     const handleCopy = (value: string, field: string) => {
         navigator.clipboard.writeText(value);
@@ -520,6 +490,23 @@ const TaskListPage: React.FC = () => {
     const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(event.target.value);
         setCurrentPage(0); // Reset to first page when search term changes        
+    };
+
+    const handleFilterChange = () => {
+        setCurrentPage(0); // Reset to first page when any filter changes
+    };
+
+    const handleCloseBillingStatusModal = () => {
+        setBillingStatusModalOpen(false);
+        setSelectedBillingStatus(null);
+        setBillingDate(new Date().toISOString().split('T')[0]);
+        setInvoiceId('');
+    };
+
+    const handleClosePaymentStatusModal = () => {
+        setPaymentStatusModalOpen(false);
+        setSelectedPaymentStatus(null);
+        setPaymentDate(new Date().toISOString().split('T')[0]);
     };
 
     const handleBillingStatusUpdate = async () => {
@@ -1011,35 +998,12 @@ const TaskListPage: React.FC = () => {
                 {/* All Buttons in One Row */}
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
                     {/* Action Buttons Group - Left Side */}
-                    <div className="flex flex-wrap gap-2">
-                        <button
-                            onClick={() => setBillingStatusModalOpen(true)}
-                            className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md transition-colors flex items-center text-sm"
-                        >
-                            <FaCheck className="mr-2" />
-                            Update Billing Status
-                        </button>
-                        <button
-                            onClick={() => setPaymentStatusModalOpen(true)}
-                            className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md transition-colors flex items-center text-sm"
-                        >
-                            <FaCheck className="mr-2" />
-                            Update Payment Status
-                        </button>
-                        <button
-                            onClick={() => setInfoForBillModalOpen(true)}
-                            className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-md transition-colors text-sm"
-                        >
-                            Info For Bill
-                        </button>
-                        <button
-                            onClick={handleGenerateSal}
-                            className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-md transition-colors flex items-center text-sm"
-                        >
-                            <FaFilePdf className="mr-2" />
-                            Generate SAL
-                        </button>
-                    </div>
+                    <TaskActionButtons
+                        onBillingStatusClick={() => setBillingStatusModalOpen(true)}
+                        onPaymentStatusClick={() => setPaymentStatusModalOpen(true)}
+                        onInfoForBillClick={() => setInfoForBillModalOpen(true)}
+                        onGenerateSalClick={handleGenerateSal}
+                    />
 
                     {/* Add New Task Button - Right Side */}
                     <button
@@ -1052,422 +1016,71 @@ const TaskListPage: React.FC = () => {
             </div>
 
             {/* Billing Status Update Modal */}
-            {billingStatusModalOpen && (
-                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center">
-                    <div className="relative p-5 border w-96 shadow-lg rounded-md bg-white dark:bg-gray-800">
-                        <div className="mt-3 text-center">
-                            <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 dark:bg-green-900">
-                                <FaCheck className="h-6 w-6 text-green-600 dark:text-green-200" />
-                            </div>
-                            <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white mt-2">
-                                Update Billing Status
-                            </h3>
-                            <div className="mt-2 px-7 py-3">
-                                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                                    This will update the billing status for all {tasks.length} filtered tasks.
-                                </p>
-                                <div className="flex flex-col space-y-4">
-                                    <div className="flex justify-center space-x-4">
-                                        <button
-                                            onClick={() => setSelectedBillingStatus(true)}
-                                            className={`px-4 py-2 rounded-md ${
-                                                selectedBillingStatus === true
-                                                    ? 'bg-green-500 text-white'
-                                                    : 'bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
-                                            }`}
-                                        >
-                                            Mark as Billed
-                                        </button>
-                                        <button
-                                            onClick={() => setSelectedBillingStatus(false)}
-                                            className={`px-4 py-2 rounded-md ${
-                                                selectedBillingStatus === false
-                                                    ? 'bg-yellow-500 text-white'
-                                                    : 'bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
-                                            }`}
-                                        >
-                                            Mark as Unbilled
-                                        </button>
-                                    </div>
-                                    <div className="flex flex-col items-center space-y-2">
-                                        <label htmlFor="billingDate" className="text-sm text-gray-600 dark:text-gray-400">
-                                            Billing Date
-                                        </label>
-                                        <input
-                                            type="date"
-                                            id="billingDate"
-                                            value={billingDate}
-                                            onChange={(e) => setBillingDate(e.target.value)}
-                                            className="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                                        />
-                                    </div>
-                                    <div className="flex flex-col items-center space-y-2">
-                                        <label htmlFor="invoiceId" className="text-sm text-gray-600 dark:text-gray-400">
-                                            Invoice ID
-                                        </label>
-                                        <input
-                                            type="text"
-                                            id="invoiceId"
-                                            value={invoiceId}
-                                            onChange={(e) => setInvoiceId(e.target.value)}
-                                            placeholder="Enter invoice ID"
-                                            className="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white w-full"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="flex justify-center space-x-4 mt-4">
-                                <button
-                                    onClick={() => {
-                                        setBillingStatusModalOpen(false);
-                                        setSelectedBillingStatus(null);
-                                        setBillingDate(new Date().toISOString().split('T')[0]);
-                                        setInvoiceId('');
-                                    }}
-                                    className="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleBillingStatusUpdate}
-                                    disabled={selectedBillingStatus === null}
-                                    className="px-4 py-2 bg-green-600 text-white text-base font-medium rounded-md shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
-                                >
-                                    Update
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <BillingStatusModal
+                isOpen={billingStatusModalOpen}
+                taskCount={tasks.length}
+                selectedBillingStatus={selectedBillingStatus}
+                onBillingStatusChange={setSelectedBillingStatus}
+                billingDate={billingDate}
+                onBillingDateChange={setBillingDate}
+                invoiceId={invoiceId}
+                onInvoiceIdChange={setInvoiceId}
+                onClose={handleCloseBillingStatusModal}
+                onUpdate={handleBillingStatusUpdate}
+            />
 
             {/* Payment Status Update Modal */}
-            {paymentStatusModalOpen && (
-                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center">
-                    <div className="relative p-5 border w-96 shadow-lg rounded-md bg-white dark:bg-gray-800">
-                        <div className="mt-3 text-center">
-                            <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-900">
-                                <FaCheck className="h-6 w-6 text-blue-600 dark:text-blue-200" />
-                            </div>
-                            <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white mt-2">
-                                Update Payment Status
-                            </h3>
-                            <div className="mt-2 px-7 py-3">
-                                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                                    This will update the payment status for all {tasks.length} filtered tasks.
-                                </p>
-                                <div className="flex flex-col space-y-4">
-                                    <div className="flex justify-center space-x-4">
-                                        <button
-                                            onClick={() => setSelectedPaymentStatus(true)}
-                                            className={`px-4 py-2 rounded-md ${
-                                                selectedPaymentStatus === true
-                                                    ? 'bg-green-500 text-white'
-                                                    : 'bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
-                                            }`}
-                                        >
-                                            Mark as Paid
-                                        </button>
-                                        <button
-                                            onClick={() => setSelectedPaymentStatus(false)}
-                                            className={`px-4 py-2 rounded-md ${
-                                                selectedPaymentStatus === false
-                                                    ? 'bg-yellow-500 text-white'
-                                                    : 'bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
-                                            }`}
-                                        >
-                                            Mark as Unpaid
-                                        </button>
-                                    </div>
-                                    <div className="flex flex-col items-center space-y-2">
-                                        <label htmlFor="paymentDate" className="text-sm text-gray-600 dark:text-gray-400">
-                                            Payment Date
-                                        </label>
-                                        <input
-                                            type="date"
-                                            id="paymentDate"
-                                            value={paymentDate}
-                                            onChange={(e) => setPaymentDate(e.target.value)}
-                                            className="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="flex justify-center space-x-4 mt-4">
-                                <button
-                                    onClick={() => {
-                                        setPaymentStatusModalOpen(false);
-                                        setSelectedPaymentStatus(null);
-                                        setPaymentDate(new Date().toISOString().split('T')[0]);
-                                    }}
-                                    className="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handlePaymentStatusUpdate}
-                                    disabled={selectedPaymentStatus === null}
-                                    className="px-4 py-2 bg-blue-600 text-white text-base font-medium rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-                                >
-                                    Update
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <PaymentStatusModal
+                isOpen={paymentStatusModalOpen}
+                taskCount={tasks.length}
+                selectedPaymentStatus={selectedPaymentStatus}
+                onPaymentStatusChange={setSelectedPaymentStatus}
+                paymentDate={paymentDate}
+                onPaymentDateChange={setPaymentDate}
+                onClose={handleClosePaymentStatusModal}
+                onUpdate={handlePaymentStatusUpdate}
+            />
 
             {/* Info For Bill Modal */}
-            {infoForBillModalOpen && (
-                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
-                    <div className="relative p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white dark:bg-gray-800 max-h-[90vh] overflow-y-auto">
-                        <div className="mt-3">
-                            <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white mt-2 mb-4 text-center">
-                                Info For Bill
-                            </h3>
-                            
-                            {/* Tasks grouped by day */}
-                            <div className="mb-4">
-                                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Tasks by Day (for Interlem Timesheet)</h4>
-                                <div className="space-y-3 max-h-64 overflow-y-auto">
-                                    {Object.entries(tasksByDay).map(([date, dayTasks]) => (
-                                        <div key={date} className="border-b border-gray-200 dark:border-gray-700 pb-2">
-                                            <div className="font-medium text-sm text-gray-800 dark:text-gray-200 mb-1">{date}</div>
-                                            {dayTasks.map((task, idx) => (
-                                                <div key={idx} className="text-xs text-gray-600 dark:text-gray-400 ml-4">
-                                                    • {task.title || task.description || 'No title'} - {task.hoursWorked}h {task.ticketId ? `(${task.ticketId})` : ''}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div className="flex flex-col items-start space-y-4">
-                                <div className="w-full">
-                                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Total Hours</label>
-                                    <div className="flex items-center space-x-2">
-                                        <input
-                                            type="text"
-                                            readOnly
-                                            value={formatNumber(totalHours)}
-                                            className="flex-1 px-2 py-1 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white text-xs"
-                                        />
-                                        <button
-                                            onClick={() => handleCopy(formatNumber(totalHours), 'hours')}
-                                            className="px-2 py-1 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 text-xs"
-                                        >
-                                            {copiedField === 'hours' ? 'Copied!' : 'Copy'}
-                                        </button>
-                                    </div>
-                                </div>
-                                <div className="w-full">
-                                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Task IDs</label>
-                                    <div className="flex items-center space-x-2">
-                                        <input
-                                            type="text"
-                                            readOnly
-                                            value={taskIdsString}
-                                            className="flex-1 px-2 py-1 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white text-xs"
-                                        />
-                                        <button
-                                            onClick={() => handleCopy(taskIdsString, 'ids')}
-                                            className="px-2 py-1 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 text-xs"
-                                        >
-                                            {copiedField === 'ids' ? 'Copied!' : 'Copy'}
-                                        </button>
-                                    </div>
-                                </div>
-                                <div className="w-full">
-                                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Total Amount</label>
-                                    <div className="flex items-center space-x-2">
-                                        <input
-                                            type="text"
-                                            readOnly
-                                            value={formatNumber(totalAmount)}
-                                            className="flex-1 px-2 py-1 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white text-xs"
-                                        />
-                                        <button
-                                            onClick={() => handleCopy(formatNumber(totalAmount), 'amount')}
-                                            className="px-2 py-1 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 text-xs"
-                                        >
-                                            {copiedField === 'amount' ? 'Copied!' : 'Copy'}
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="flex justify-center space-x-4 mt-6">
-                                <button
-                                    onClick={() => setInfoForBillModalOpen(false)}
-                                    className="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-                                >
-                                    Close
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <InfoForBillModal
+                isOpen={infoForBillModalOpen}
+                tasksByDay={tasksByDay}
+                totalHours={totalHours}
+                taskIdsString={taskIdsString}
+                totalAmount={totalAmount}
+                copiedField={copiedField}
+                onCopy={handleCopy}
+                onClose={() => setInfoForBillModalOpen(false)}
+            />
 
             {/* Filter Section */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 mb-4">
-                <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
-                    {/* Search Bar */}
-                    <div className="flex-1 w-full lg:w-auto">
-                        <input
-                            type="text"
-                            placeholder="Search tasks..."
-                            ref={searchTermRef}
-                            value={searchTerm}
-                            onChange={handleSearchChange}
-                            className="w-full p-2.5 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        />
-                    </div>
+            <TaskFilters
+                searchTermRef={searchTermRef}
+                searchTerm={searchTerm}
+                onSearchChange={handleSearchChange}
+                projectId={projectId}
+                projectFilter={projectFilter}
+                onProjectFilterChange={setProjectFilter}
+                projects={projects}
+                statusFilter={statusFilter}
+                onStatusFilterChange={setStatusFilter}
+                typeFilter={typeFilter}
+                onTypeFilterChange={setTypeFilter}
+                pageSize={pageSize}
+                onPageSizeChange={handlePageSizeChange}
+                onFilterChange={handleFilterChange}
+            />
 
-                    {/* Filters Row */}
-                    <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
-                        {!projectId && (
-                            <select
-                                value={projectFilter !== null ? projectFilter : (searchParams.get('projectId') || '')}
-                                onChange={(e) => {
-                                    const value = e.target.value;
-                                    console.log('Project dropdown changed - value:', value, 'type:', typeof value);
-                                    
-                                    // Update URL params to sync with dropdown selection
-                                    const newParams = new URLSearchParams(searchParams);
-                                    if (value && value !== '') {
-                                        const parsedValue = parseInt(value, 10);
-                                        console.log('Setting projectFilter to:', parsedValue);
-                                        setProjectFilter(isNaN(parsedValue) ? null : parsedValue);
-                                        // Update URL to keep it in sync
-                                        newParams.set('projectId', value);
-                                    } else {
-                                        console.log('Setting projectFilter to null');
-                                        setProjectFilter(null);
-                                        // Remove projectId from URL when clearing
-                                        newParams.delete('projectId');
-                                    }
-                                    setSearchParams(newParams);
-                                    setCurrentPage(0);
-                                }}
-                                className="p-2.5 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-w-[180px]"
-                            >
-                                <option value="">All Projects</option>
-                                {projects.map(project => (
-                                    <option key={project.id} value={String(project.id)}>
-                                        {project.name}
-                                    </option>
-                                ))}
-                            </select>
-                        )}
-                        
-                        <select
-                            value={statusFilter}
-                            onChange={(e) => {
-                                setStatusFilter(e.target.value);
-                                setCurrentPage(0);
-                            }}
-                            className="p-2.5 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-w-[140px]"
-                        >
-                            <option value="all">All Status</option>
-                            <option value="billed">Billed</option>
-                            <option value="unbilled">Unbilled</option>
-                            <option value="paid">Paid</option>
-                            <option value="unpaid">Unpaid</option>
-                        </select>
-
-                        {/* Type Checkboxes */}
-                        <div className="flex items-center gap-4 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700">
-                            <label className="flex items-center cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={typeFilter === 'EVOLUTIVA'}
-                                    onChange={e => {
-                                        setTypeFilter(e.target.checked ? 'EVOLUTIVA' : null);
-                                        setCurrentPage(0);
-                                    }}
-                                    className="mr-2 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                                />
-                                <span className="text-sm text-gray-700 dark:text-gray-300">Evolutiva</span>
-                            </label>
-                            <label className="flex items-center cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={typeFilter === 'CORRETTIVA'}
-                                    onChange={e => {
-                                        setTypeFilter(e.target.checked ? 'CORRETTIVA' : null);
-                                        setCurrentPage(0);
-                                    }}
-                                    className="mr-2 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                                />
-                                <span className="text-sm text-gray-700 dark:text-gray-300">Correttiva</span>
-                            </label>
-                        </div>
-
-                        {/* Page Size */}
-                        <div className="flex items-center gap-2 ml-auto lg:ml-0">
-                            <label htmlFor="pageSizeSelect" className="text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">Items per page:</label>
-                            <select
-                                id="pageSizeSelect"
-                                value={pageSize}
-                                onChange={handlePageSizeChange}
-                                className="p-2.5 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            >
-                                <option value="5">5</option>
-                                <option value="10">10</option>
-                                <option value="20">20</option>
-                                <option value="50">50</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Project Summary Section - Only show when filters are active */}
-            {(() => {
-                const urlMonth = searchParams.get('month');
-                const urlYear = searchParams.get('year');
-                const urlProjectId = searchParams.get('projectId');
-                const hasActiveFilters = monthFilter || yearFilter || urlMonth || urlYear ||
-                                       projectFilter !== null || urlProjectId ||
-                                       debouncedSearchTerm || statusFilter !== 'all' || typeFilter !== null;
-                
-                return hasActiveFilters && allFilteredTasks.length > 0 && projectSummaryArray.length > 0;
-            })() && (
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 mb-4">
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Project Summary</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {projectSummaryArray.map((summary) => (
-                            <div 
-                                key={`${summary.projectId}-${summary.projectName}`}
-                                className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-700/50"
-                            >
-                                <h3 className="font-medium text-gray-900 dark:text-white mb-2 truncate" title={summary.projectName}>
-                                    {summary.projectName}
-                                </h3>
-                                <div className="space-y-1 text-sm">
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-600 dark:text-gray-400">Tasks:</span>
-                                        <span className="font-medium text-gray-900 dark:text-white">{summary.taskCount}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-600 dark:text-gray-400">Total Hours:</span>
-                                        <span className="font-medium text-gray-900 dark:text-white">
-                                            {formatNumber(summary.totalHours)}h
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between border-t border-gray-200 dark:border-gray-600 pt-1 mt-1">
-                                        <span className="text-gray-600 dark:text-gray-400 font-medium">Total Amount:</span>
-                                        <span className="font-bold text-blue-600 dark:text-blue-400">
-                                            {formatNumber(summary.totalAmount)} {summary.currency}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
+            {/* Project Summary Section */}
+            <ProjectSummary
+                allFilteredTasks={allFilteredTasks}
+                monthFilter={monthFilter}
+                yearFilter={yearFilter}
+                projectFilter={projectFilter}
+                debouncedSearchTerm={debouncedSearchTerm}
+                statusFilter={statusFilter}
+                typeFilter={typeFilter}
+            />
 
             {tasks.length === 0 && !loading ? (
                 <div className="text-center text-gray-500 dark:text-gray-400 mt-10">

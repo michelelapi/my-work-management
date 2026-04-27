@@ -40,6 +40,9 @@ const TaskFormPage: React.FC = () => {
     const [showConfirmModal, setShowConfirmModal] = useState(false);
 
     const isEditMode = !!taskId;
+    const selectableProjects = isEditMode
+        ? projects
+        : projects.filter(project => project.status === 'ACTIVE');
 
     useEffect(() => {
         const fetchData = async () => {
@@ -65,11 +68,23 @@ const TaskFormPage: React.FC = () => {
                     setTask(prev => ({
                         ...prev,
                         projectId: projectIdNum,
-                        rateUsed: foundProject?.hourlyRate
+                        rateUsed: foundProject?.hourlyRate,
+                        clientId: foundProject?.defaultClientId
                     }));
                     // Fetch clients for the project
                     const fetchedClients = await clientService.getAllClientsByProjectId(projectIdNum);
                     setClients(fetchedClients);
+                } else {
+                    const activeProjects = fetchedProjects.filter(project => project.status === 'ACTIVE');
+                    if (activeProjects.length === 1) {
+                        const onlyProject = activeProjects[0];
+                        setTask(prev => ({
+                            ...prev,
+                            projectId: onlyProject.id,
+                            rateUsed: onlyProject.hourlyRate,
+                            clientId: onlyProject.defaultClientId
+                        }));
+                    }
                 }
             } catch (err) {
                 console.error('Error fetching data for task form:', err);
@@ -89,6 +104,23 @@ const TaskFormPage: React.FC = () => {
                 try {
                     const fetchedClients = await clientService.getAllClientsByProjectId(task.projectId);
                     setClients(fetchedClients);
+                    if (!isEditMode) {
+                        const selectedProject = projects.find(p => p.id === task.projectId);
+                        setTask(prev => {
+                            const hasCurrentClient = !!prev.clientId && fetchedClients.some(c => c.id === prev.clientId);
+                            if (hasCurrentClient) {
+                                return prev;
+                            }
+
+                            const hasDefaultClient = !!selectedProject?.defaultClientId &&
+                                fetchedClients.some(c => c.id === selectedProject.defaultClientId);
+
+                            return {
+                                ...prev,
+                                clientId: hasDefaultClient ? selectedProject?.defaultClientId : undefined
+                            };
+                        });
+                    }
                 } catch (err) {
                     console.error('Error fetching clients:', err);
                     setClients([]);
@@ -99,7 +131,7 @@ const TaskFormPage: React.FC = () => {
         };
 
         fetchClients();
-    }, [task.projectId]);
+    }, [task.projectId, projects, isEditMode]);
 
     const validateForm = (): boolean => {
         const errors: ValidationErrors = {};
@@ -143,8 +175,8 @@ const TaskFormPage: React.FC = () => {
                 projectId: projectIdNum,
                 // Only set rateUsed if the user hasn't already set it or if it's empty-
                 rateUsed: foundProject?.hourlyRate,
-                // Clear clientId when project changes
-                clientId: undefined
+                // Set project's default client when available
+                clientId: foundProject?.defaultClientId
             }));
         } else if (name === 'clientId') {
             const clientIdNum = value ? parseInt(value) : undefined;
@@ -271,7 +303,7 @@ const TaskFormPage: React.FC = () => {
                         // disabled={!!urlProjectId}
                     >
                         <option value="">-- Select a Project --</option>
-                        {projects.map(project => (
+                        {selectableProjects.map(project => (
                             <option key={project.id} value={project.id}>
                                 {project.name}
                             </option>

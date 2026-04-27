@@ -1,6 +1,6 @@
-import React, { RefObject } from 'react';
+import React, { RefObject, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Project } from '../types/project';
+import { Project, ProjectStatus } from '../types/project';
 
 interface TaskFiltersProps {
     searchTermRef: RefObject<HTMLInputElement>;
@@ -36,6 +36,32 @@ const TaskFilters: React.FC<TaskFiltersProps> = ({
     onFilterChange
 }) => {
     const [searchParams, setSearchParams] = useSearchParams();
+    const activeProjects = projects.filter(project => project.status === ProjectStatus.ACTIVE);
+
+    useEffect(() => {
+        if (projectId || activeProjects.length !== 1) {
+            return;
+        }
+
+        const onlyActiveProjectId = activeProjects[0].id;
+        if (onlyActiveProjectId === undefined) {
+            return;
+        }
+
+        const selectedProjectId = projectFilter ?? (
+            searchParams.get('projectId') ? parseInt(searchParams.get('projectId') as string, 10) : null
+        );
+
+        if (selectedProjectId === onlyActiveProjectId) {
+            return;
+        }
+
+        onProjectFilterChange(onlyActiveProjectId);
+        const newParams = new URLSearchParams(searchParams);
+        newParams.set('projectId', String(onlyActiveProjectId));
+        setSearchParams(newParams);
+        onFilterChange();
+    }, [activeProjects, onFilterChange, onProjectFilterChange, projectFilter, projectId, searchParams, setSearchParams]);
 
     const handleProjectFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const value = e.target.value;
@@ -93,7 +119,7 @@ const TaskFilters: React.FC<TaskFiltersProps> = ({
                             className="p-2.5 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-w-[180px]"
                         >
                             <option value="">All Projects</option>
-                            {projects.map(project => (
+                            {activeProjects.map(project => (
                                 <option key={project.id} value={String(project.id)}>
                                     {project.name}
                                 </option>

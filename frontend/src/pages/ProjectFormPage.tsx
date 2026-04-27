@@ -45,6 +45,7 @@ const ProjectFormPage: React.FC = () => {
     description: '',
     contactEmail: '',
     contactPhone: '',
+    projectManagerName: '',
   });
 
   const isEditMode = !!projectId;
@@ -171,7 +172,7 @@ const ProjectFormPage: React.FC = () => {
     const { name, value } = e.target;
     setProject(prev => ({
       ...prev,
-      [name]: name === 'companyId' || name === 'estimatedHours' || name === 'dailyRate' || name === 'hourlyRate' ? (value ? Number(value) : undefined) : value,
+      [name]: name === 'companyId' || name === 'estimatedHours' || name === 'dailyRate' || name === 'hourlyRate' || name === 'defaultClientId' ? (value ? Number(value) : undefined) : value,
       status: name === 'status' ? (value as ProjectStatus) : prev.status,
       startDate: name === 'startDate' ? value : prev.startDate,
       endDate: name === 'endDate' ? value : prev.endDate,
@@ -219,6 +220,9 @@ const ProjectFormPage: React.FC = () => {
     try {
       await clientService.deleteClient(parseInt(projectId, 10), clientId);
       setClients(clients.filter(client => client.id !== clientId));
+      if (project.defaultClientId === clientId) {
+        setProject(prev => ({ ...prev, defaultClientId: undefined }));
+      }
       setDeleteClientModalOpen(false);
       setClientToDelete(null);
     } catch (err) {
@@ -245,6 +249,7 @@ const ProjectFormPage: React.FC = () => {
       description: client.description || '',
       contactEmail: client.contactEmail || '',
       contactPhone: client.contactPhone || '',
+      projectManagerName: client.projectManagerName || '',
     });
     setShowClientForm(true);
   };
@@ -258,6 +263,7 @@ const ProjectFormPage: React.FC = () => {
       description: '',
       contactEmail: '',
       contactPhone: '',
+      projectManagerName: '',
     });
     setShowClientForm(true);
   };
@@ -281,6 +287,11 @@ const ProjectFormPage: React.FC = () => {
           clientFormData
         );
         setClients([...clients, created]);
+        // Initialize default client when adding the first client.
+        setProject(prev => ({
+          ...prev,
+          defaultClientId: prev.defaultClientId ?? created.id
+        }));
       }
       // Close the modal and reset form, but stay on the same page
       setShowClientForm(false);
@@ -291,6 +302,7 @@ const ProjectFormPage: React.FC = () => {
         description: '',
         contactEmail: '',
         contactPhone: '',
+        projectManagerName: '',
       });
       // Clear any previous errors
       setSaveError(null);
@@ -311,6 +323,7 @@ const ProjectFormPage: React.FC = () => {
         description: '',
         contactEmail: '',
         contactPhone: '',
+        projectManagerName: '',
       });
     }
   };
@@ -582,6 +595,33 @@ const ProjectFormPage: React.FC = () => {
             )}
           </div>
 
+          {/* Default Client */}
+          <div>
+            <label htmlFor="defaultClientId" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Default Client for New Tasks
+            </label>
+            <select
+              id="defaultClientId"
+              name="defaultClientId"
+              value={project.defaultClientId || ''}
+              onChange={handleChange}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
+              disabled={!isEditMode || clients.length === 0}
+            >
+              <option value="">-- No default client --</option>
+              {clients.map(client => (
+                <option key={client.id} value={client.id}>
+                  {client.name}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              {!isEditMode
+                ? 'Save the project first, then add clients to set a default.'
+                : 'This client will be pre-selected when creating a new task for this project.'}
+            </p>
+          </div>
+
         </div>
 
         {/* Clients Section - Only show in edit mode */}
@@ -597,7 +637,6 @@ const ProjectFormPage: React.FC = () => {
                 Add Client
               </button>
             </div>
-
             {clients.length === 0 ? (
               <div className="text-center text-gray-500 dark:text-gray-400 py-4">
                 No clients found. Add your first client!
@@ -608,6 +647,7 @@ const ProjectFormPage: React.FC = () => {
                   <thead className="bg-gray-50 dark:bg-gray-700">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Name</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Project Manager</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Description</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Contact</th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
@@ -619,6 +659,11 @@ const ProjectFormPage: React.FC = () => {
                         <td className="px-4 py-3 whitespace-nowrap">
                           <div className="text-sm font-medium text-gray-900 dark:text-white">
                             {client.name}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="text-sm text-gray-500 dark:text-gray-300">
+                            {client.projectManagerName || '-'}
                           </div>
                         </td>
                         <td className="px-4 py-3">
@@ -760,6 +805,18 @@ const ProjectFormPage: React.FC = () => {
                   rows={3}
                   value={clientFormData.description}
                   onChange={(e) => setClientFormData({ ...clientFormData, description: e.target.value })}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
+                />
+              </div>
+              <div>
+                <label htmlFor="projectManagerName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Project Manager Name
+                </label>
+                <input
+                  type="text"
+                  id="projectManagerName"
+                  value={clientFormData.projectManagerName || ''}
+                  onChange={(e) => setClientFormData({ ...clientFormData, projectManagerName: e.target.value })}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
                 />
               </div>

@@ -37,6 +37,9 @@ public class ClientDTO {
     @Schema(description = "Contact phone of the client", example = "+1234567890")
     private String contactPhone;
 
+    @Schema(description = "Name of the client's project manager", example = "Jane Doe")
+    private String projectManagerName;
+
     @Schema(description = "Timestamp when the client was created", example = "2024-03-20T10:00:00")
     private LocalDateTime createdAt;
 

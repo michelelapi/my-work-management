@@ -87,6 +87,7 @@ public class ClientServiceImpl implements ClientService {
                 .description(client.getDescription())
                 .contactEmail(client.getContactEmail())
                 .contactPhone(client.getContactPhone())
+                .projectManagerName(client.getProjectManagerName())
                 .createdAt(client.getCreatedAt())
                 .updatedAt(client.getUpdatedAt())
                 .userEmail(client.getUserEmail())
@@ -99,6 +100,7 @@ public class ClientServiceImpl implements ClientService {
                 .description(dto.getDescription())
                 .contactEmail(dto.getContactEmail())
                 .contactPhone(dto.getContactPhone())
+                .projectManagerName(dto.getProjectManagerName())
                 .userEmail(dto.getUserEmail())
                 .build();
     }
@@ -108,5 +110,6 @@ public class ClientServiceImpl implements ClientService {
         if (dto.getDescription() != null) client.setDescription(dto.getDescription());
         if (dto.getContactEmail() != null) client.setContactEmail(dto.getContactEmail());
         if (dto.getContactPhone() != null) client.setContactPhone(dto.getContactPhone());
+        if (dto.getProjectManagerName() != null) client.setProjectManagerName(dto.getProjectManagerName());
     }
 }

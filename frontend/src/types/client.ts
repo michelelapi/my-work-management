@@ -5,6 +5,7 @@ export interface Client {
   description?: string;
   contactEmail?: string;
   contactPhone?: string;
+  projectManagerName?: string;
   createdAt?: string;
   updatedAt?: string;
   userEmail?: string;

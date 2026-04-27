@@ -60,6 +60,10 @@ public class Project {
     @Column(nullable = false)
     private ProjectStatus status;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "default_client_id")
+    private Client defaultClient;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

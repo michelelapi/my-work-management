@@ -34,6 +34,7 @@ const ProjectDetailsPage: React.FC = () => {
     description: '',
     contactEmail: '',
     contactPhone: '',
+    projectManagerName: '',
   });
 
   // Load sections state from localStorage
@@ -160,6 +161,7 @@ const ProjectDetailsPage: React.FC = () => {
       description: client.description || '',
       contactEmail: client.contactEmail || '',
       contactPhone: client.contactPhone || '',
+      projectManagerName: client.projectManagerName || '',
     });
     setShowClientForm(true);
   };
@@ -172,6 +174,7 @@ const ProjectDetailsPage: React.FC = () => {
       description: '',
       contactEmail: '',
       contactPhone: '',
+      projectManagerName: '',
     });
     setShowClientForm(true);
   };
@@ -203,6 +206,7 @@ const ProjectDetailsPage: React.FC = () => {
         description: '',
         contactEmail: '',
         contactPhone: '',
+        projectManagerName: '',
       });
     } catch (err) {
       console.error('Error saving client:', err);
@@ -219,6 +223,7 @@ const ProjectDetailsPage: React.FC = () => {
       description: '',
       contactEmail: '',
       contactPhone: '',
+      projectManagerName: '',
     });
   };
 
@@ -388,6 +393,18 @@ const ProjectDetailsPage: React.FC = () => {
                 />
               </div>
               <div>
+                <label htmlFor="projectManagerName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Project Manager Name
+                </label>
+                <input
+                  type="text"
+                  id="projectManagerName"
+                  value={clientFormData.projectManagerName || ''}
+                  onChange={(e) => setClientFormData({ ...clientFormData, projectManagerName: e.target.value })}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
+                />
+              </div>
+              <div>
                 <label htmlFor="clientEmail" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Contact Email
                 </label>
@@ -470,6 +487,7 @@ const ProjectDetailsPage: React.FC = () => {
                   <thead className="bg-gray-50 dark:bg-gray-700">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Name</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Project Manager</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Description</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Contact</th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
@@ -481,6 +499,11 @@ const ProjectDetailsPage: React.FC = () => {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-medium text-gray-900 dark:text-white">
                             {client.name}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-500 dark:text-gray-300">
+                            {client.projectManagerName || '-'}
                           </div>
                         </td>
                         <td className="px-6 py-4">

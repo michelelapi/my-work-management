@@ -1,9 +1,11 @@
 package com.myworkmanagement.company.service.impl;
 
 import com.myworkmanagement.company.dto.ProjectDTO;
+import com.myworkmanagement.company.entity.Client;
 import com.myworkmanagement.company.entity.Company;
 import com.myworkmanagement.company.entity.Project;
 import com.myworkmanagement.company.exception.ResourceNotFoundException;
+import com.myworkmanagement.company.repository.ClientRepository;
 import com.myworkmanagement.company.repository.CompanyRepository;
 import com.myworkmanagement.company.repository.ProjectRepository;
 import com.myworkmanagement.company.service.ProjectService;
@@ -13,9 +15,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
-
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -23,6 +22,7 @@ public class ProjectServiceImpl implements ProjectService {
 
     private final ProjectRepository projectRepository;
     private final CompanyRepository companyRepository;
+    private final ClientRepository clientRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -56,6 +56,9 @@ public class ProjectServiceImpl implements ProjectService {
 
         if (projectRepository.existsByCompanyIdAndName(companyId, projectDTO.getName())) {
             throw new IllegalArgumentException("Project with name \"" + projectDTO.getName() + "\" already exists for this company.");
+        }
+        if (projectDTO.getDefaultClientId() != null) {
+            throw new IllegalArgumentException("Default client can be set only after project creation.");
         }
 
         Project project = mapToEntity(projectDTO);
@@ -105,6 +108,7 @@ public class ProjectServiceImpl implements ProjectService {
                 .endDate(project.getEndDate())
                 .estimatedHours(project.getEstimatedHours())
                 .status(project.getStatus())
+                .defaultClientId(project.getDefaultClient() != null ? project.getDefaultClient().getId() : null)
                 .createdAt(project.getCreatedAt())
                 .updatedAt(project.getUpdatedAt())
                 .companyName(project.getCompany().getName())
@@ -139,6 +143,17 @@ public class ProjectServiceImpl implements ProjectService {
         if (dto.getEndDate() != null) project.setEndDate(dto.getEndDate());
         if (dto.getEstimatedHours() != null) project.setEstimatedHours(dto.getEstimatedHours());
         if (dto.getStatus() != null) project.setStatus(dto.getStatus());
+        if (dto.getDefaultClientId() != null) {
+            project.setDefaultClient(resolveDefaultClientForProject(dto.getDefaultClientId(), project.getId()));
+        } else {
+            project.setDefaultClient(null);
+        }
+    }
+
+    private Client resolveDefaultClientForProject(Long defaultClientId, Long projectId) {
+        return clientRepository.findByIdAndProjectId(defaultClientId, projectId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Client not found with id: " + defaultClientId + " for project: " + projectId));
     }
 
     private boolean existsByCompanyIdAndId(Long companyId, Long projectId) {

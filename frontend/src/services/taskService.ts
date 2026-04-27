@@ -186,7 +186,8 @@ export const taskService = {
         userAddress?: string,
         userPhone?: string,
         userEmailAddress?: string,
-        projectName?: string
+        projectName?: string,
+        skipReminderCheck: boolean = false
     ): Promise<Blob> {
         const params: any = { year, month };
         if (projectId !== undefined) {
@@ -209,7 +210,8 @@ export const taskService = {
         }
         const response = await api.get('/tasks/sal/pdf', {
             params,
-            responseType: 'blob'
+            responseType: 'blob',
+            ...(skipReminderCheck ? { _skipReminderCheck: true } : {})
         });
         return response.data;
     }

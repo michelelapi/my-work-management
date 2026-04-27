@@ -3,8 +3,6 @@ package com.myworkmanagement.company.dto;
 import com.myworkmanagement.company.entity.ProjectStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -54,6 +52,9 @@ public class ProjectDTO {
 
     @Schema(description = "Current status of the project", example = "IN_PROGRESS")
     private ProjectStatus status;
+
+    @Schema(description = "Default client ID for new tasks in this project", example = "3")
+    private Long defaultClientId;
 
     @Schema(description = "Timestamp when the project was created", example = "2024-03-20T10:00:00")
     private LocalDateTime createdAt;

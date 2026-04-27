@@ -42,6 +42,9 @@ public class Client {
     @Column(name = "contact_phone")
     private String contactPhone;
 
+    @Column(name = "project_manager_name")
+    private String projectManagerName;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

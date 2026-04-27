@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import noteService from '../services/noteService';
 
 const Header: React.FC = () => {
   const { user, logout } = useAuth();
@@ -9,6 +10,7 @@ const Header: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [previousPathname, setPreviousPathname] = useState<string>('');
+  const [unreadNotesCount, setUnreadNotesCount] = useState<number>(0);
   const currentPathRef = useRef<string>(location.pathname);
   
   // Hide navigation links on login and register pages
@@ -22,10 +24,36 @@ const Header: React.FC = () => {
     }
   }, [location.pathname, isAuthPage]);
 
+  useEffect(() => {
+    const loadUnreadCount = async () => {
+      if (!user) {
+        setUnreadNotesCount(0);
+        return;
+      }
+      try {
+        const count = await noteService.getUnreadCount();
+        setUnreadNotesCount(count);
+      } catch (error) {
+        console.error('Error loading unread notes count:', error);
+      }
+    };
+
+    const handleNotesUpdated = () => {
+      loadUnreadCount();
+    };
+
+    loadUnreadCount();
+    window.addEventListener('notes-updated', handleNotesUpdated);
+
+    return () => {
+      window.removeEventListener('notes-updated', handleNotesUpdated);
+    };
+  }, [user, location.pathname]);
+
   // Get page name from pathname
   const getPageName = (pathname: string): string => {
     if (pathname === '/dashboard' || pathname === '/') return 'Dashboard';
-    if (pathname === '/companies' || pathname.startsWith('/companies') && !pathname.includes('/projects') && !pathname.includes('/tasks')) {
+    if (pathname === '/companies' || (pathname.startsWith('/companies') && !pathname.includes('/projects') && !pathname.includes('/tasks'))) {
       if (pathname === '/companies') return 'Companies';
       if (pathname.includes('/edit')) return 'Edit Company';
       if (pathname.includes('/new')) return 'New Company';
@@ -43,6 +71,8 @@ const Header: React.FC = () => {
       if (pathname.includes('/new')) return 'New Task';
       return 'Task Details';
     }
+    if (pathname === '/notes') return 'Notes';
+    if (pathname === '/reminders') return 'Reminders';
     if (pathname === '/ai-agent') return 'AI Agent';
     return 'Previous Page';
   };
@@ -92,6 +122,14 @@ const Header: React.FC = () => {
     
     if (path === '/ai-agent') {
       return currentPath === '/ai-agent';
+    }
+
+    if (path === '/notes') {
+      return currentPath === '/notes';
+    }
+
+    if (path === '/reminders') {
+      return currentPath === '/reminders';
     }
     
     return currentPath === path;
@@ -143,6 +181,19 @@ const Header: React.FC = () => {
               </li>
               {user ? (
                 <>
+                  <li>
+                    <Link to="/notes" className={`${getLinkClasses('/notes')} relative inline-flex`}>
+                      Notes
+                      {unreadNotesCount > 0 && (
+                        <span className="absolute -top-2 -right-3 min-w-[1.2rem] h-5 px-1 text-xs rounded-full bg-red-600 text-white flex items-center justify-center">
+                          {unreadNotesCount}
+                        </span>
+                      )}
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/reminders" className={getLinkClasses('/reminders')}>Reminders</Link>
+                  </li>
                   <li>
                     <Link to="/companies" className={getLinkClasses('/companies')}>Company</Link>
                   </li>

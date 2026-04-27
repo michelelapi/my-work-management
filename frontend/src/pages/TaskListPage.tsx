@@ -2,6 +2,8 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Task } from '../types/task';
 import { taskService, PageResponse } from '../services/taskService';
+import { runReminderPreflightGate } from '../services/api';
+import reminderService from '../services/reminderService';
 import projectService from '../services/projectService';
 import { Project } from '../types/project';
 // import { FaPen, FaTrash } from 'react-icons/fa';
@@ -29,6 +31,7 @@ const TaskListPage: React.FC = () => {
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const [tasks, setTasks] = useState<Task[]>([]);
+    const [selectedTaskIds, setSelectedTaskIds] = useState<Set<number>>(new Set());
     const [allFilteredTasks, setAllFilteredTasks] = useState<Task[]>([]); // Store all filtered tasks for summary
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -72,6 +75,7 @@ const TaskListPage: React.FC = () => {
     // Project filter state
     const [projectFilter, setProjectFilter] = useState<number | null>(null);
     const [projects, setProjects] = useState<Project[]>([]);
+    const [activeReminderActivities, setActiveReminderActivities] = useState<Set<string>>(new Set());
 
     // Date filter state from URL query params
     const [monthFilter, setMonthFilter] = useState<string | null>(null);
@@ -90,8 +94,11 @@ const TaskListPage: React.FC = () => {
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
 
-    // Compute info for bill - group tasks by day
-    const tasksByDay: Record<string, Task[]> = tasks.reduce((acc, task) => {
+    const selectedTasks = tasks.filter(task => task.id !== undefined && selectedTaskIds.has(task.id));
+    const hasSelectedTasks = selectedTasks.length > 0;
+
+    // Compute info for bill - group selected tasks by day
+    const tasksByDay: Record<string, Task[]> = selectedTasks.reduce((acc, task) => {
         const date = task.startDate ? new Date(task.startDate).toLocaleDateString() : 'No Date';
         if (!acc[date]) {
             acc[date] = [];
@@ -100,9 +107,9 @@ const TaskListPage: React.FC = () => {
         return acc;
     }, {} as Record<string, Task[]>);
 
-    const taskIdsString = tasks.map(task => task.ticketId).filter(id => id).join(', ');
-    const totalAmount = tasks.reduce((sum, task) => sum + (task.hoursWorked * (task.rateUsed ?? 0)), 0);
-    const totalHours = tasks.reduce((sum, task) => sum + (task.hoursWorked || 0), 0);
+    const taskIdsString = selectedTasks.map(task => task.ticketId).filter(id => id).join(', ');
+    const totalAmount = selectedTasks.reduce((sum, task) => sum + (task.hoursWorked * (task.rateUsed ?? 0)), 0);
+    const totalHours = selectedTasks.reduce((sum, task) => sum + (task.hoursWorked || 0), 0);
 
     const handleCopy = (value: string, field: string) => {
         navigator.clipboard.writeText(value);
@@ -165,6 +172,29 @@ const TaskListPage: React.FC = () => {
             }
         };
         fetchProjects();
+    }, []);
+
+    // Load active reminders to show bell indicators on action buttons
+    useEffect(() => {
+        const loadActiveReminderActivities = async () => {
+            try {
+                const reminders = await reminderService.getReminders(0, 200, 'creationDate,desc');
+                setActiveReminderActivities(new Set(reminders.map((reminder) => reminder.activityName)));
+            } catch (err) {
+                console.error('Error loading reminders for action indicators:', err);
+            }
+        };
+
+        const handleRemindersUpdated = () => {
+            loadActiveReminderActivities();
+        };
+
+        loadActiveReminderActivities();
+        window.addEventListener('reminders-updated', handleRemindersUpdated);
+
+        return () => {
+            window.removeEventListener('reminders-updated', handleRemindersUpdated);
+        };
     }, []);
 
     // Debounce search term
@@ -445,6 +475,20 @@ const TaskListPage: React.FC = () => {
         }
     }, [loading, searchTerm]);
 
+    useEffect(() => {
+        // Keep selection synced with visible tasks.
+        setSelectedTaskIds(prev => {
+            const visibleIds = new Set(tasks.filter(task => task.id !== undefined).map(task => task.id as number));
+            const next = new Set<number>();
+            prev.forEach(id => {
+                if (visibleIds.has(id)) {
+                    next.add(id);
+                }
+            });
+            return next;
+        });
+    }, [tasks]);
+
     const handleDelete = async (projectId: number, taskId: number) => {
         try {
                 await taskService.deleteTask(projectId, taskId); 
@@ -509,11 +553,48 @@ const TaskListPage: React.FC = () => {
         setPaymentDate(new Date().toISOString().split('T')[0]);
     };
 
+    const refreshCurrentTaskPage = async () => {
+        const effectiveProjectId: number | undefined = projectId
+            ? parseInt(projectId)
+            : (projectFilter !== null && projectFilter !== undefined)
+                ? projectFilter
+                : undefined;
+
+        let isBilled: boolean | undefined = undefined;
+        let isPaid: boolean | undefined = undefined;
+        if (statusFilter === 'billed') {
+            isBilled = true;
+        } else if (statusFilter === 'unbilled') {
+            isBilled = false;
+        } else if (statusFilter === 'paid') {
+            isPaid = true;
+        } else if (statusFilter === 'unpaid') {
+            isPaid = false;
+        }
+
+        const sortParam = `${sortField},${sortDirection}`;
+        const response = await taskService.getTasks(
+            effectiveProjectId,
+            currentPage,
+            pageSize,
+            debouncedSearchTerm,
+            isBilled,
+            isPaid,
+            sortParam,
+            typeFilter || undefined
+        );
+
+        setTasks(response.content);
+        setTotalPages(response.totalPages);
+        setTotalElements(response.totalElements);
+    };
+
     const handleBillingStatusUpdate = async () => {
         if (selectedBillingStatus === null) return;
+        if (!hasSelectedTasks) return;
 
         try {
-            const taskUpdates = tasks.map(task => ({
+            const taskUpdates = selectedTasks.map(task => ({
                 taskId: task.id!,
                 isBilled: selectedBillingStatus,
                 billingDate: billingDate,
@@ -522,16 +603,8 @@ const TaskListPage: React.FC = () => {
 
             await taskService.updateTasksBillingStatus(taskUpdates);
             
-            // Refresh the task list
-            const response = await taskService.getTasks(
-                projectId ? parseInt(projectId) : undefined,
-                currentPage,
-                pageSize,
-                debouncedSearchTerm
-            );
-            setTasks(response.content);
-            setTotalPages(response.totalPages);
-            setTotalElements(response.totalElements);
+            // Refresh list with the same page/filter/sort to keep order stable.
+            await refreshCurrentTaskPage();
             
             setBillingStatusModalOpen(false);
             setSelectedBillingStatus(null);
@@ -545,9 +618,10 @@ const TaskListPage: React.FC = () => {
 
     const handlePaymentStatusUpdate = async () => {
         if (selectedPaymentStatus === null) return;
+        if (!hasSelectedTasks) return;
 
         try {
-            const taskUpdates = tasks.map(task => ({
+            const taskUpdates = selectedTasks.map(task => ({
                 taskId: task.id!,
                 isPaid: selectedPaymentStatus,
                 paymentDate: paymentDate
@@ -555,16 +629,8 @@ const TaskListPage: React.FC = () => {
 
             await taskService.updateTasksPaymentStatus(taskUpdates);
             
-            // Refresh the task list
-            const response = await taskService.getTasks(
-                projectId ? parseInt(projectId) : undefined,
-                currentPage,
-                pageSize,
-                debouncedSearchTerm
-            );
-            setTasks(response.content);
-            setTotalPages(response.totalPages);
-            setTotalElements(response.totalElements);
+            // Refresh list with the same page/filter/sort to keep order stable.
+            await refreshCurrentTaskPage();
             
             setPaymentStatusModalOpen(false);
             setSelectedPaymentStatus(null);
@@ -763,6 +829,31 @@ const TaskListPage: React.FC = () => {
         setCurrentPage(0); // Reset to first page when sorting changes
     };
 
+    const handleTaskSelectionChange = (taskId: number, checked: boolean) => {
+        setSelectedTaskIds(prev => {
+            const next = new Set(prev);
+            if (checked) {
+                next.add(taskId);
+            } else {
+                next.delete(taskId);
+            }
+            return next;
+        });
+    };
+
+    const handleSelectAllVisible = (checked: boolean) => {
+        const visibleTaskIds = tasks.filter(task => task.id !== undefined).map(task => task.id as number);
+        setSelectedTaskIds(prev => {
+            const next = new Set(prev);
+            if (checked) {
+                visibleTaskIds.forEach(id => next.add(id));
+            } else {
+                visibleTaskIds.forEach(id => next.delete(id));
+            }
+            return next;
+        });
+    };
+
     // Handle SAL PDF generation - uses filtered tasks
     const handleGenerateSal = async () => {
         try {
@@ -817,10 +908,21 @@ const TaskListPage: React.FC = () => {
                 }
             }
             
+            const shouldProceed = await runReminderPreflightGate('GET', '/tasks/sal/pdf');
+            if (!shouldProceed) {
+                return;
+            }
+
             const blob = await taskService.generateSalPdf(
                 year,
                 month,
-                projectFilter || (projectId ? parseInt(projectId) : undefined)
+                projectFilter || (projectId ? parseInt(projectId) : undefined),
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                true
             );
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -999,10 +1101,45 @@ const TaskListPage: React.FC = () => {
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
                     {/* Action Buttons Group - Left Side */}
                     <TaskActionButtons
-                        onBillingStatusClick={() => setBillingStatusModalOpen(true)}
-                        onPaymentStatusClick={() => setPaymentStatusModalOpen(true)}
-                        onInfoForBillClick={() => setInfoForBillModalOpen(true)}
+                        onBillingStatusClick={async () => {
+                            if (!hasSelectedTasks) {
+                                window.alert('Select at least one task first.');
+                                return;
+                            }
+                            const shouldProceed = await runReminderPreflightGate('PUT', '/tasks/billing-status');
+                            if (!shouldProceed) {
+                                return;
+                            }
+                            setBillingStatusModalOpen(true);
+                        }}
+                        onPaymentStatusClick={async () => {
+                            if (!hasSelectedTasks) {
+                                window.alert('Select at least one task first.');
+                                return;
+                            }
+                            const shouldProceed = await runReminderPreflightGate('PUT', '/tasks/payment-status');
+                            if (!shouldProceed) {
+                                return;
+                            }
+                            setPaymentStatusModalOpen(true);
+                        }}
+                        onInfoForBillClick={async () => {
+                            if (!hasSelectedTasks) {
+                                window.alert('Select at least one task first.');
+                                return;
+                            }
+                            const infoForBillPath = projectId ? `/projects/${projectId}/tasks` : '/tasks';
+                            const shouldProceed = await runReminderPreflightGate('GET', infoForBillPath);
+                            if (!shouldProceed) {
+                                return;
+                            }
+                            setInfoForBillModalOpen(true);
+                        }}
                         onGenerateSalClick={handleGenerateSal}
+                        hasBillingStatusReminder={activeReminderActivities.has('Update Billing Status')}
+                        hasPaymentStatusReminder={activeReminderActivities.has('Update Payment Status')}
+                        hasInfoForBillReminder={activeReminderActivities.has('Info For Bill')}
+                        hasGenerateSalReminder={activeReminderActivities.has('Generate SAL')}
                     />
 
                     {/* Add New Task Button - Right Side */}
@@ -1018,7 +1155,7 @@ const TaskListPage: React.FC = () => {
             {/* Billing Status Update Modal */}
             <BillingStatusModal
                 isOpen={billingStatusModalOpen}
-                taskCount={tasks.length}
+                taskCount={selectedTasks.length}
                 selectedBillingStatus={selectedBillingStatus}
                 onBillingStatusChange={setSelectedBillingStatus}
                 billingDate={billingDate}
@@ -1032,7 +1169,7 @@ const TaskListPage: React.FC = () => {
             {/* Payment Status Update Modal */}
             <PaymentStatusModal
                 isOpen={paymentStatusModalOpen}
-                taskCount={tasks.length}
+                taskCount={selectedTasks.length}
                 selectedPaymentStatus={selectedPaymentStatus}
                 onPaymentStatusChange={setSelectedPaymentStatus}
                 paymentDate={paymentDate}
@@ -1091,6 +1228,15 @@ const TaskListPage: React.FC = () => {
                     <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 table-fixed">
                         <thead className="bg-gray-50 dark:bg-gray-700">
                             <tr>
+                                <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/12">
+                                    <input
+                                        type="checkbox"
+                                        aria-label="Select all tasks"
+                                        checked={tasks.length > 0 && selectedTasks.length === tasks.filter(task => task.id !== undefined).length}
+                                        onChange={(e) => handleSelectAllVisible(e.target.checked)}
+                                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                    />
+                                </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/12 cursor-pointer" onClick={() => handleSort('ticketId')}>
                                     Task ID {sortField === 'ticketId' && (sortDirection === 'asc' ? '▲' : '▼')}
                                 </th>
@@ -1120,6 +1266,19 @@ const TaskListPage: React.FC = () => {
                         <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                             {sortedTasks.map((task) => (
                                 <tr key={task.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                                    <td className="px-3 py-4 text-center w-1/12">
+                                        <input
+                                            type="checkbox"
+                                            aria-label={`Select task ${task.ticketId || task.id}`}
+                                            checked={task.id !== undefined && selectedTaskIds.has(task.id)}
+                                            onChange={(e) => {
+                                                if (task.id !== undefined) {
+                                                    handleTaskSelectionChange(task.id, e.target.checked);
+                                                }
+                                            }}
+                                            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                        />
+                                    </td>
                                     <td className="px-6 py-4 break-words w-1/12">
                                         <div className="text-sm font-medium text-gray-900 dark:text-white">{task.ticketId}</div>
                                     </td>

@@ -17,6 +17,8 @@ import ProtectedRoute from './components/auth/ProtectedRoute';
 import TaskFormPage from './pages/TaskFormPage';
 import ProjectDetailsPage from './pages/ProjectDetailsPage';
 import AiAgentPage from './pages/AiAgentPage';
+import NotesPage from './pages/NotesPage';
+import RemindersPage from './pages/RemindersPage';
 
 function App() {
   return (
@@ -56,6 +58,8 @@ function App() {
 
                 {/* AI Agent Route */}
                 <Route path="/ai-agent" element={<ProtectedRoute><AiAgentPage /></ProtectedRoute>} />
+                <Route path="/notes" element={<ProtectedRoute><NotesPage /></ProtectedRoute>} />
+                <Route path="/reminders" element={<ProtectedRoute><RemindersPage /></ProtectedRoute>} />
 
                 <Route path="*" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               </Routes>

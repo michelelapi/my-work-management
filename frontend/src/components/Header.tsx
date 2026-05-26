@@ -65,6 +65,12 @@ const Header: React.FC = () => {
       if (pathname.includes('/new')) return 'New Project';
       return 'Project Details';
     }
+    if (pathname === '/contracts' || pathname.includes('/contracts')) {
+      if (pathname === '/contracts') return 'Contracts';
+      if (pathname.includes('/edit')) return 'Edit Contract';
+      if (pathname.includes('/new')) return 'New Contract';
+      return 'Contract Details';
+    }
     if (pathname === '/tasks' || pathname.includes('/tasks')) {
       if (pathname === '/tasks') return 'Tasks';
       if (pathname.includes('/edit')) return 'Edit Task';
@@ -109,11 +115,19 @@ const Header: React.FC = () => {
       );
     }
     
-    // Check companies (but not if projects or tasks is active)
+    // Check contracts
+    if (path === '/contracts') {
+      return currentPath === '/contracts' ||
+             currentPath.startsWith('/contracts/') ||
+             currentPath.includes('/contracts');
+    }
+
+    // Check companies (but not if projects, tasks, or contracts is active)
     if (path === '/companies') {
       const isProjectRoute = currentPath.includes('/projects');
       const isTaskRoute = currentPath.includes('/tasks');
-      return !isProjectRoute && !isTaskRoute && currentPath.startsWith('/companies');
+      const isContractRoute = currentPath.includes('/contracts');
+      return !isProjectRoute && !isTaskRoute && !isContractRoute && currentPath.startsWith('/companies');
     }
     
     if (path === '/dashboard') {
@@ -199,6 +213,9 @@ const Header: React.FC = () => {
                   </li>
                   <li>
                     <Link to="/projects" className={getLinkClasses('/projects')}>Projects</Link>
+                  </li>
+                  <li>
+                    <Link to="/contracts" className={getLinkClasses('/contracts')}>Contracts</Link>
                   </li>
                   <li>
                     <Link to="/tasks" className={getLinkClasses('/tasks')}>Tasks</Link>

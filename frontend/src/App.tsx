@@ -19,6 +19,8 @@ import ProjectDetailsPage from './pages/ProjectDetailsPage';
 import AiAgentPage from './pages/AiAgentPage';
 import NotesPage from './pages/NotesPage';
 import RemindersPage from './pages/RemindersPage';
+import ContractListPage from './pages/ContractListPage';
+import ContractFormPage from './pages/ContractFormPage';
 
 function App() {
   return (
@@ -48,6 +50,12 @@ function App() {
                 <Route path="/companies/:companyId/projects/new" element={<ProtectedRoute><ProjectFormPage /></ProtectedRoute>} />
                 <Route path="/companies/:companyId/projects/:projectId/edit" element={<ProtectedRoute><ProjectFormPage /></ProtectedRoute>} />
                 <Route path="/companies/:companyId/projects/:projectId" element={<ProjectDetailsPage />} />
+
+                {/* Contract Routes */}
+                <Route path="/contracts" element={<ProtectedRoute><ContractListPage /></ProtectedRoute>} />
+                <Route path="/contracts/new" element={<ProtectedRoute><ContractFormPage /></ProtectedRoute>} />
+                <Route path="/companies/:companyId/contracts/new" element={<ProtectedRoute><ContractFormPage /></ProtectedRoute>} />
+                <Route path="/companies/:companyId/contracts/:contractId/edit" element={<ProtectedRoute><ContractFormPage /></ProtectedRoute>} />
 
                 {/* Task Routes */}
                 <Route path="/tasks" element={<ProtectedRoute><TaskListPage /></ProtectedRoute>} />

@@ -12,6 +12,7 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -96,4 +97,7 @@ public class TaskDTO {
 
     @Schema(description = "Name of the company this task belongs to", example = "Example Corp")
     private String companyName;
+
+    @Schema(description = "Contract usages for this task (populated when billed)")
+    private List<TaskContractUsageDTO> contractUsages;
 } 

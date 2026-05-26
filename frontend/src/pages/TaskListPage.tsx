@@ -913,7 +913,11 @@ const TaskListPage: React.FC = () => {
                 return;
             }
 
-            const blob = await taskService.generateSalPdf(
+            const selectedIds = selectedTaskIds.size > 0
+                ? Array.from(selectedTaskIds)
+                : undefined;
+
+            const result = await taskService.generateSalPdf(
                 year,
                 month,
                 projectFilter || (projectId ? parseInt(projectId) : undefined),
@@ -922,12 +926,13 @@ const TaskListPage: React.FC = () => {
                 undefined,
                 undefined,
                 undefined,
-                true
+                true,
+                selectedIds
             );
-            const url = window.URL.createObjectURL(blob);
+            const url = window.URL.createObjectURL(result.blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `SAL_${year}_${String(month).padStart(2, '0')}.pdf`;
+            a.download = result.filename;
             document.body.appendChild(a);
             a.click();
             window.URL.revokeObjectURL(url);
@@ -1329,6 +1334,15 @@ const TaskListPage: React.FC = () => {
                                                 {task.isPaid ? 'Paid' : 'Unpaid'}
                                             </span>
                                         </div>
+                                        {task.isBilled && task.contractUsages && task.contractUsages.length > 0 && (
+                                            <div className="mt-1 space-y-0.5">
+                                                {task.contractUsages.map((cu, idx) => (
+                                                    <div key={idx} className="text-xs text-gray-500 dark:text-gray-400">
+                                                        <span className="font-mono">{cu.contractCode}</span>: {cu.amountUsed.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </td>
                                     <td className="px-6 py-4 text-right text-sm font-medium break-words w-1/12">
                                         <button

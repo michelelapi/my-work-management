@@ -3,10 +3,12 @@ package com.myworkmanagement.company.service.impl;
 import com.myworkmanagement.company.dto.ProjectDTO;
 import com.myworkmanagement.company.entity.Client;
 import com.myworkmanagement.company.entity.Company;
+import com.myworkmanagement.company.entity.Contract;
 import com.myworkmanagement.company.entity.Project;
 import com.myworkmanagement.company.exception.ResourceNotFoundException;
 import com.myworkmanagement.company.repository.ClientRepository;
 import com.myworkmanagement.company.repository.CompanyRepository;
+import com.myworkmanagement.company.repository.ContractRepository;
 import com.myworkmanagement.company.repository.ProjectRepository;
 import com.myworkmanagement.company.service.ProjectService;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +16,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -23,6 +28,7 @@ public class ProjectServiceImpl implements ProjectService {
     private final ProjectRepository projectRepository;
     private final CompanyRepository companyRepository;
     private final ClientRepository clientRepository;
+    private final ContractRepository contractRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -96,6 +102,9 @@ public class ProjectServiceImpl implements ProjectService {
     }
 
     private ProjectDTO mapToDTO(Project project) {
+        List<Long> contractIds = contractRepository.findByProjectId(project.getId())
+                .stream().map(Contract::getId).collect(Collectors.toList());
+
         return ProjectDTO.builder()
                 .id(project.getId())
                 .companyId(project.getCompany().getId())
@@ -112,6 +121,7 @@ public class ProjectServiceImpl implements ProjectService {
                 .createdAt(project.getCreatedAt())
                 .updatedAt(project.getUpdatedAt())
                 .companyName(project.getCompany().getName())
+                .contractIds(contractIds)
                 .build();
     }
 
@@ -147,6 +157,24 @@ public class ProjectServiceImpl implements ProjectService {
             project.setDefaultClient(resolveDefaultClientForProject(dto.getDefaultClientId(), project.getId()));
         } else {
             project.setDefaultClient(null);
+        }
+        if (dto.getContractIds() != null) {
+            updateProjectContracts(project, dto.getContractIds());
+        }
+    }
+
+    private void updateProjectContracts(Project project, List<Long> contractIds) {
+        List<Contract> currentContracts = contractRepository.findByProjectId(project.getId());
+        for (Contract contract : currentContracts) {
+            contract.getProjects().remove(project);
+            contractRepository.save(contract);
+        }
+        if (contractIds != null && !contractIds.isEmpty()) {
+            List<Contract> newContracts = contractRepository.findAllById(contractIds);
+            for (Contract contract : newContracts) {
+                contract.getProjects().add(project);
+                contractRepository.save(contract);
+            }
         }
     }
 

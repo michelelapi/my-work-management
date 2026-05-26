@@ -11,6 +11,7 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -67,4 +68,7 @@ public class ProjectDTO {
 
     @Schema(description = "Email of the user who owns/manages this project", example = "user@example.com")
     private String userEmail;
+
+    @Schema(description = "IDs of contracts linked to this project")
+    private List<Long> contractIds;
 } 

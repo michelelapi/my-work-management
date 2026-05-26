@@ -1,3 +1,5 @@
+import { ContractUsage } from './contract';
+
 export interface Task {
     id?: number;
     projectId?: number;
@@ -24,4 +26,5 @@ export interface Task {
     updatedAt?: string;
     companyName?: string;
     userEmail?: string;
+    contractUsages?: ContractUsage[];
 } 

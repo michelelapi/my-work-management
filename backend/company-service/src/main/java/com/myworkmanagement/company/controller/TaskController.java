@@ -1,14 +1,20 @@
 package com.myworkmanagement.company.controller;
 
+import com.myworkmanagement.company.dto.TaskContractUsageDTO;
 import com.myworkmanagement.company.dto.TaskDTO;
 import com.myworkmanagement.company.dto.TaskBillingStatusUpdateDTO;
 import com.myworkmanagement.company.dto.TaskPaymentStatusUpdateDTO;
 import com.myworkmanagement.company.entity.Company;
 import com.myworkmanagement.company.entity.Project;
 import com.myworkmanagement.company.entity.Task;
+import com.myworkmanagement.company.entity.TaskContractUsage;
 import com.myworkmanagement.company.exception.ResourceNotFoundException;
+import com.myworkmanagement.company.entity.Contract;
+import com.myworkmanagement.company.entity.ContractStatus;
 import com.myworkmanagement.company.repository.CompanyRepository;
+import com.myworkmanagement.company.repository.ContractRepository;
 import com.myworkmanagement.company.repository.ProjectRepository;
+import com.myworkmanagement.company.repository.TaskContractUsageRepository;
 import com.myworkmanagement.company.repository.TaskRepository;
 import com.myworkmanagement.company.service.SalPdfService;
 import com.myworkmanagement.company.service.TaskService;
@@ -34,8 +40,16 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.ByteArrayOutputStream;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 @Slf4j
 @RestController
@@ -48,8 +62,10 @@ public class TaskController {
     private final TaskService taskService;
     private final SalPdfService salPdfService;
     private final CompanyRepository companyRepository;
+    private final ContractRepository contractRepository;
     private final TaskRepository taskRepository;
     private final ProjectRepository projectRepository;
+    private final TaskContractUsageRepository taskContractUsageRepository;
 
     @PostMapping("/projects/{projectId}/tasks")
     @Operation(summary = "Create new task", description = "Creates a new task for a project")
@@ -376,6 +392,8 @@ public class TaskController {
             @Parameter(description = "Year for the report", required = true, example = "2025") @RequestParam Integer year,
             @Parameter(description = "Month for the report (1-12)", required = true, example = "11") @RequestParam Integer month,
             @Parameter(description = "Project ID to filter tasks (optional)", required = false) @RequestParam(required = false) Long projectId,
+            @Parameter(description = "Specific task IDs to include (optional, if omitted all matching tasks are included)", required = false) @RequestParam(required = false) List<Long> taskIds,
+            @Parameter(description = "Contract ID to cap SAL amounts (optional, auto-detects first OPEN contract if omitted)", required = false) @RequestParam(required = false) Long contractId,
             @Parameter(description = "User name for the document", required = false) @RequestParam(required = false) String userName,
             @Parameter(description = "User address for the document", required = false) @RequestParam(required = false) String userAddress,
             @Parameter(description = "User phone for the document", required = false) @RequestParam(required = false) String userPhone,
@@ -385,19 +403,21 @@ public class TaskController {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             String userEmail = authentication.getName();
             
-            // Calculate date range for the month
             LocalDate startDate = LocalDate.of(year, month, 1);
             LocalDate endDate = startDate.withDayOfMonth(startDate.lengthOfMonth());
             LocalDate reportMonth = startDate;
             
-            // Find Dedagroup company
             Company dedagroupCompany = companyRepository.findByName("Dedagroup")
                 .orElseThrow(() -> new ResourceNotFoundException("Company 'Dedagroup' not found"));
             
-            // Fetch tasks for the month - only from Dedagroup company
             List<TaskDTO> tasks;
-            if (projectId != null) {
-                // Verify the project belongs to Dedagroup
+            if (taskIds != null && !taskIds.isEmpty()) {
+                List<Task> selectedTasks = taskRepository.findAllById(taskIds);
+                tasks = selectedTasks.stream()
+                    .filter(t -> t.getUserEmail().equals(userEmail))
+                    .map(this::convertTaskToDTO)
+                    .collect(java.util.stream.Collectors.toList());
+            } else if (projectId != null) {
                 Project project = projectRepository.findById(projectId)
                     .orElseThrow(() -> new ResourceNotFoundException("Project not found with id: " + projectId));
                 
@@ -405,106 +425,254 @@ public class TaskController {
                     throw new IllegalArgumentException("Project does not belong to Dedagroup company");
                 }
                 
-                // Get tasks for specific project in date range
                 List<Task> projectTasks = taskRepository.findByProjectIdAndStartDateBetween(
                     projectId, startDate, endDate, 
                     org.springframework.data.domain.PageRequest.of(0, Integer.MAX_VALUE)).getContent();
                 
-                // Convert Task entities to TaskDTOs
                 tasks = projectTasks.stream()
-                    .map(task -> TaskDTO.builder()
-                        .id(task.getId())
-                        .projectId(task.getProject().getId())
-                        .projectName(task.getProject().getName())
-                        .companyName(task.getProject().getCompany().getName())
-                        .title(task.getTitle())
-                        .description(task.getDescription())
-                        .ticketId(task.getTicketId())
-                        .startDate(task.getStartDate())
-                        .endDate(task.getEndDate())
-                        .hoursWorked(task.getHoursWorked())
-                        .rateUsed(task.getRateUsed())
-                        .type(task.getType())
-                        .currency(task.getCurrency())
-                        .isBilled(task.getIsBilled())
-                        .isPaid(task.getIsPaid())
-                        .billingDate(task.getBillingDate())
-                        .paymentDate(task.getPaymentDate())
-                        .invoiceId(task.getInvoiceId())
-                        .referencedTaskId(task.getReferencedTaskId())
-                        .clientId(task.getClient() != null ? task.getClient().getId() : null)
-                        .clientName(task.getClient() != null ? task.getClient().getName() : null)
-                        .notes(task.getNotes())
-                        .userEmail(task.getUserEmail())
-                        .createdAt(task.getCreatedAt())
-                        .updatedAt(task.getUpdatedAt())
-                        .build())
+                    .map(this::convertTaskToDTO)
                     .collect(java.util.stream.Collectors.toList());
             } else {
-                // Get all tasks for user from Dedagroup company in the date range
                 List<Task> dedagroupTasks = taskRepository.findByUserEmailAndCompanyIdAndDateRange(
                     userEmail, dedagroupCompany.getId(), startDate, endDate);
                 
-                // Convert Task entities to TaskDTOs
                 tasks = dedagroupTasks.stream()
-                    .map(task -> TaskDTO.builder()
-                        .id(task.getId())
-                        .projectId(task.getProject().getId())
-                        .projectName(task.getProject().getName())
-                        .companyName(task.getProject().getCompany().getName())
-                        .title(task.getTitle())
-                        .description(task.getDescription())
-                        .ticketId(task.getTicketId())
-                        .startDate(task.getStartDate())
-                        .endDate(task.getEndDate())
-                        .hoursWorked(task.getHoursWorked())
-                        .rateUsed(task.getRateUsed())
-                        .type(task.getType())
-                        .currency(task.getCurrency())
-                        .isBilled(task.getIsBilled())
-                        .isPaid(task.getIsPaid())
-                        .billingDate(task.getBillingDate())
-                        .paymentDate(task.getPaymentDate())
-                        .invoiceId(task.getInvoiceId())
-                        .referencedTaskId(task.getReferencedTaskId())
-                        .clientId(task.getClient() != null ? task.getClient().getId() : null)
-                        .clientName(task.getClient() != null ? task.getClient().getName() : null)
-                        .notes(task.getNotes())
-                        .userEmail(task.getUserEmail())
-                        .createdAt(task.getCreatedAt())
-                        .updatedAt(task.getUpdatedAt())
-                        .build())
+                    .map(this::convertTaskToDTO)
                     .collect(java.util.stream.Collectors.toList());
             }
-            
+
             if (tasks.isEmpty()) {
                 return ResponseEntity.badRequest().build();
             }
-            
-            // Use defaults if not provided
+
             if (userName == null || userName.isEmpty()) {
-                userName = userEmail.split("@")[0]; // Use email prefix as default
+                userName = userEmail.split("@")[0];
             }
             if (userEmailAddress == null || userEmailAddress.isEmpty()) {
                 userEmailAddress = userEmail;
             }
-            
-            // Generate PDF
-            byte[] pdfBytes = salPdfService.generateSalPdf(tasks, userEmail, userName, 
-                userAddress, userPhone, userEmailAddress, projectName, reportMonth);
-            
+
+            Map<Contract, List<TaskDTO>> allocations = allocateTasksToContracts(tasks, contractId);
+
+            if (allocations.size() <= 1) {
+                Map.Entry<Contract, List<TaskDTO>> single = allocations.entrySet().iterator().next();
+                Contract contract = single.getKey();
+                List<TaskDTO> salTasks = single.getValue();
+                BigDecimal remainingAfterSal = computeRemainingAfterSal(contract, salTasks);
+                byte[] pdfBytes = salPdfService.generateSalPdf(salTasks, userEmail, userName,
+                    userAddress, userPhone, userEmailAddress, projectName, reportMonth,
+                    contract != null ? contract.getCode() : null, remainingAfterSal);
+
+                HttpHeaders headers = new HttpHeaders();
+                headers.setContentType(MediaType.APPLICATION_PDF);
+                headers.setContentDispositionFormData("attachment",
+                    String.format("SAL_%d_%02d.pdf", year, month));
+                return ResponseEntity.ok().headers(headers).body(pdfBytes);
+            }
+
+            ByteArrayOutputStream zipBaos = new ByteArrayOutputStream();
+            ZipOutputStream zipOut = new ZipOutputStream(zipBaos);
+
+            for (Map.Entry<Contract, List<TaskDTO>> entry : allocations.entrySet()) {
+                Contract contract = entry.getKey();
+                List<TaskDTO> salTasks = entry.getValue();
+                BigDecimal remainingAfterSal = computeRemainingAfterSal(contract, salTasks);
+
+                byte[] pdfBytes = salPdfService.generateSalPdf(salTasks, userEmail, userName,
+                    userAddress, userPhone, userEmailAddress, projectName, reportMonth,
+                    contract != null ? contract.getCode() : null, remainingAfterSal);
+
+                String contractCode = contract != null ? contract.getCode() : "no-contract";
+                String entryName = String.format("SAL_%d_%02d_%s.pdf", year, month, contractCode);
+                zipOut.putNextEntry(new ZipEntry(entryName));
+                zipOut.write(pdfBytes);
+                zipOut.closeEntry();
+            }
+
+            zipOut.finish();
+            zipOut.close();
+
             HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_PDF);
-            headers.setContentDispositionFormData("attachment", 
-                String.format("SAL_%d_%02d.pdf", year, month));
-            
-            return ResponseEntity.ok()
-                .headers(headers)
-                .body(pdfBytes);
+            headers.setContentType(MediaType.parseMediaType("application/zip"));
+            headers.setContentDispositionFormData("attachment",
+                String.format("SAL_%d_%02d.zip", year, month));
+            return ResponseEntity.ok().headers(headers).body(zipBaos.toByteArray());
+
         } catch (Exception e) {
             log.error("Error generating SAL PDF", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 
+    /**
+     * Allocates tasks across OPEN contracts for the project.
+     * Tasks are processed in order. When a contract's budget is exhausted, the
+     * overflowing task is split: the portion that fits stays with the current contract,
+     * and the remainder moves to the next OPEN contract.
+     * Returns a map of Contract -> task list (preserving contract order).
+     * If no contracts exist, returns a single entry with null key and all tasks uncapped.
+     */
+    private Map<Contract, List<TaskDTO>> allocateTasksToContracts(List<TaskDTO> tasks, Long contractId) {
+        Map<Contract, List<TaskDTO>> allocations = new LinkedHashMap<>();
+
+        List<Contract> openContracts;
+        if (contractId != null) {
+            Contract c = contractRepository.findById(contractId).orElse(null);
+            openContracts = c != null ? List.of(c) : List.of();
+        } else {
+            Long taskProjectId = tasks.get(0).getProjectId();
+            openContracts = contractRepository.findByProjectIdAndStatus(
+                taskProjectId, ContractStatus.OPEN);
+        }
+
+        if (openContracts.isEmpty()) {
+            allocations.put(null, tasks);
+            return allocations;
+        }
+
+        List<TaskDTO> remainingTasks = new ArrayList<>(tasks);
+
+        for (Contract contract : openContracts) {
+            if (remainingTasks.isEmpty()) break;
+
+            BigDecimal availableAmount = contract.getAmountAvailable();
+            if (availableAmount == null || availableAmount.compareTo(BigDecimal.ZERO) <= 0) continue;
+
+            List<TaskDTO> contractTasks = new ArrayList<>();
+            List<TaskDTO> nextRemaining = new ArrayList<>();
+            BigDecimal runningTotal = BigDecimal.ZERO;
+            boolean budgetExhausted = false;
+
+            for (TaskDTO task : remainingTasks) {
+                if (budgetExhausted) {
+                    nextRemaining.add(task);
+                    continue;
+                }
+
+                BigDecimal hours = task.getHoursWorked() != null ? task.getHoursWorked() : BigDecimal.ZERO;
+                BigDecimal rate = task.getRateUsed() != null ? task.getRateUsed() : BigDecimal.ZERO;
+                BigDecimal taskCost = hours.multiply(rate);
+                BigDecimal newTotal = runningTotal.add(taskCost);
+
+                if (newTotal.compareTo(availableAmount) <= 0) {
+                    contractTasks.add(task);
+                    runningTotal = newTotal;
+                } else {
+                    BigDecimal remaining = availableAmount.subtract(runningTotal);
+                    if (remaining.compareTo(BigDecimal.ZERO) > 0 && rate.compareTo(BigDecimal.ZERO) > 0) {
+                        BigDecimal adjustedHours = remaining.divide(rate, 2, RoundingMode.HALF_UP);
+                        contractTasks.add(copyTaskWithAdjustedHours(task, adjustedHours));
+
+                        BigDecimal spillHours = hours.subtract(adjustedHours);
+                        if (spillHours.compareTo(BigDecimal.ZERO) > 0) {
+                            nextRemaining.add(copyTaskWithAdjustedHours(task, spillHours));
+                        }
+                    } else {
+                        nextRemaining.add(task);
+                    }
+                    budgetExhausted = true;
+                }
+            }
+
+            if (!contractTasks.isEmpty()) {
+                allocations.put(contract, contractTasks);
+            }
+            remainingTasks = nextRemaining;
+        }
+
+        if (!remainingTasks.isEmpty() && !allocations.isEmpty()) {
+            Contract lastContract = null;
+            for (Contract c : allocations.keySet()) lastContract = c;
+            allocations.get(lastContract).addAll(remainingTasks);
+        } else if (!remainingTasks.isEmpty()) {
+            allocations.put(null, remainingTasks);
+        }
+
+        return allocations;
+    }
+
+    private BigDecimal computeRemainingAfterSal(Contract contract, List<TaskDTO> salTasks) {
+        if (contract == null) return null;
+        BigDecimal salTotal = BigDecimal.ZERO;
+        for (TaskDTO t : salTasks) {
+            BigDecimal h = t.getHoursWorked() != null ? t.getHoursWorked() : BigDecimal.ZERO;
+            BigDecimal r = t.getRateUsed() != null ? t.getRateUsed() : BigDecimal.ZERO;
+            salTotal = salTotal.add(h.multiply(r));
+        }
+        BigDecimal remaining = contract.getAmountAvailable().subtract(salTotal);
+        return remaining.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : remaining;
+    }
+
+    private TaskDTO copyTaskWithAdjustedHours(TaskDTO task, BigDecimal adjustedHours) {
+        return TaskDTO.builder()
+            .id(task.getId())
+            .projectId(task.getProjectId())
+            .projectName(task.getProjectName())
+            .companyName(task.getCompanyName())
+            .title(task.getTitle())
+            .description(task.getDescription())
+            .ticketId(task.getTicketId())
+            .startDate(task.getStartDate())
+            .endDate(task.getEndDate())
+            .hoursWorked(adjustedHours)
+            .rateUsed(task.getRateUsed())
+            .type(task.getType())
+            .currency(task.getCurrency())
+            .isBilled(task.getIsBilled())
+            .isPaid(task.getIsPaid())
+            .billingDate(task.getBillingDate())
+            .paymentDate(task.getPaymentDate())
+            .invoiceId(task.getInvoiceId())
+            .referencedTaskId(task.getReferencedTaskId())
+            .clientId(task.getClientId())
+            .clientName(task.getClientName())
+            .notes(task.getNotes())
+            .userEmail(task.getUserEmail())
+            .createdAt(task.getCreatedAt())
+            .updatedAt(task.getUpdatedAt())
+            .contractUsages(task.getContractUsages())
+            .build();
+    }
+
+    private TaskDTO convertTaskToDTO(Task task) {
+        List<TaskContractUsage> usages = taskContractUsageRepository.findByTaskId(task.getId());
+        List<TaskContractUsageDTO> usageDTOs = usages != null && !usages.isEmpty()
+                ? usages.stream()
+                    .map(u -> TaskContractUsageDTO.builder()
+                            .contractId(u.getContract().getId())
+                            .contractCode(u.getContractCode())
+                            .amountUsed(u.getAmountUsed())
+                            .build())
+                    .collect(java.util.stream.Collectors.toList())
+                : null;
+
+        return TaskDTO.builder()
+                .id(task.getId())
+                .projectId(task.getProject().getId())
+                .projectName(task.getProject().getName())
+                .companyName(task.getProject().getCompany().getName())
+                .title(task.getTitle())
+                .description(task.getDescription())
+                .ticketId(task.getTicketId())
+                .startDate(task.getStartDate())
+                .endDate(task.getEndDate())
+                .hoursWorked(task.getHoursWorked())
+                .rateUsed(task.getRateUsed())
+                .type(task.getType())
+                .currency(task.getCurrency())
+                .isBilled(task.getIsBilled())
+                .isPaid(task.getIsPaid())
+                .billingDate(task.getBillingDate())
+                .paymentDate(task.getPaymentDate())
+                .invoiceId(task.getInvoiceId())
+                .referencedTaskId(task.getReferencedTaskId())
+                .clientId(task.getClient() != null ? task.getClient().getId() : null)
+                .clientName(task.getClient() != null ? task.getClient().getName() : null)
+                .notes(task.getNotes())
+                .userEmail(task.getUserEmail())
+                .createdAt(task.getCreatedAt())
+                .updatedAt(task.getUpdatedAt())
+                .contractUsages(usageDTOs)
+                .build();
+    }
 } 

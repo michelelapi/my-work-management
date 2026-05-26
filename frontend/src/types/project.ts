@@ -21,4 +21,5 @@ export interface Project {
   updatedAt?: string; // LocalDateTime as string
   companyName?: string; // Add this field to display company name
   defaultClientId?: number;
+  contractIds?: number[];
 } 

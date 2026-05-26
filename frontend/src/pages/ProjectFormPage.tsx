@@ -3,9 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Project, ProjectStatus } from '../types/project';
 import { Company } from '../types/company'; // Import Company type for company selection
 import { Client } from '../types/client';
+import { Contract } from '../types/contract';
 import projectService from '../services/projectService';
-import companyService from '../services/companyService'; // Import company service for fetching companies
+import companyService from '../services/companyService';
 import clientService from '../services/clientService';
+import contractService from '../services/contractService';
 
 interface ValidationErrors {
   companyId?: string;
@@ -29,6 +31,8 @@ const ProjectFormPage: React.FC = () => {
   });
   const [companies, setCompanies] = useState<Company[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [companyContracts, setCompanyContracts] = useState<Contract[]>([]);
+  const [selectedContractIds, setSelectedContractIds] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,14 +66,23 @@ const ProjectFormPage: React.FC = () => {
 
         if (isEditMode && companyId && projectId) {
           const projectIdNum = parseInt(projectId, 10);
-          const [fetchedProject, fetchedClients] = await Promise.all([
-            projectService.getProjectById(parseInt(companyId, 10), projectIdNum),
-            clientService.getAllClientsByProjectId(projectIdNum)
+          const companyIdNum = parseInt(companyId, 10);
+          const [fetchedProject, fetchedClients, fetchedCompanyContracts] = await Promise.all([
+            projectService.getProjectById(companyIdNum, projectIdNum),
+            clientService.getAllClientsByProjectId(projectIdNum),
+            contractService.getContractsByCompany(companyIdNum)
           ]);
           setProject(fetchedProject);
           setClients(fetchedClients);
+          setCompanyContracts(fetchedCompanyContracts);
+          setSelectedContractIds(fetchedProject.contractIds || []);
         } else if (companyId) {
-          setProject(prev => ({ ...prev, companyId: parseInt(companyId, 10) }));
+          const companyIdNum = parseInt(companyId, 10);
+          setProject(prev => ({ ...prev, companyId: companyIdNum }));
+          try {
+            const fetchedCompanyContracts = await contractService.getContractsByCompany(companyIdNum);
+            setCompanyContracts(fetchedCompanyContracts);
+          } catch (_) { /* company may not have contracts yet */ }
         }
       } catch (err) {
         console.error('Error fetching data for project form:', err);
@@ -168,7 +181,7 @@ const ProjectFormPage: React.FC = () => {
     return isValid;
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const handleChange = async (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setProject(prev => ({
       ...prev,
@@ -177,6 +190,24 @@ const ProjectFormPage: React.FC = () => {
       startDate: name === 'startDate' ? value : prev.startDate,
       endDate: name === 'endDate' ? value : prev.endDate,
     }));
+
+    if (name === 'companyId' && value) {
+      try {
+        const contracts = await contractService.getContractsByCompany(Number(value));
+        setCompanyContracts(contracts);
+        setSelectedContractIds([]);
+      } catch (_) {
+        setCompanyContracts([]);
+      }
+    }
+  };
+
+  const handleContractToggle = (contractId: number) => {
+    setSelectedContractIds(prev =>
+      prev.includes(contractId)
+        ? prev.filter(id => id !== contractId)
+        : [...prev, contractId]
+    );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -193,12 +224,12 @@ const ProjectFormPage: React.FC = () => {
     setSaveError(null);
     setIsSaving(true);
 
+    const projectWithContracts = { ...project, contractIds: selectedContractIds };
     try {
       if (isEditMode && projectId) {
-        await projectService.updateProject(project.companyId, parseInt(projectId, 10), project);
+        await projectService.updateProject(project.companyId, parseInt(projectId, 10), projectWithContracts);
       } else {
-        const createdProject = await projectService.createProject(project.companyId, project);
-        // After creating, navigate to edit mode so clients can be managed
+        const createdProject = await projectService.createProject(project.companyId, projectWithContracts);
         if (createdProject.id) {
           navigate(`/companies/${project.companyId}/projects/${createdProject.id}/edit`);
           return;
@@ -623,6 +654,44 @@ const ProjectFormPage: React.FC = () => {
           </div>
 
         </div>
+
+        {/* Contracts Section */}
+        {companyContracts.length > 0 && (
+          <div className="mt-6 border-t border-gray-200 dark:border-gray-700 pt-6">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-3">Linked Contracts</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">Select the contracts associated with this project.</p>
+            <div className="space-y-2 max-h-60 overflow-y-auto border border-gray-200 dark:border-gray-600 rounded-md p-3">
+              {companyContracts.map(contract => (
+                <label
+                  key={contract.id}
+                  className="flex items-center space-x-3 p-2 rounded hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedContractIds.includes(contract.id!)}
+                    onChange={() => handleContractToggle(contract.id!)}
+                    className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700"
+                  />
+                  <span className="text-sm text-gray-900 dark:text-white">
+                    <span className="font-mono font-medium">{contract.code}</span>
+                    {' - '}
+                    {contract.name}
+                    <span className="ml-2 text-gray-500 dark:text-gray-400">
+                      ({contract.amountAvailable.toLocaleString('it-IT', { minimumFractionDigits: 2 })} / {contract.totalAmount.toLocaleString('it-IT', { minimumFractionDigits: 2 })})
+                    </span>
+                    <span className={`ml-2 px-1.5 py-0.5 text-xs rounded ${
+                      contract.status === 'OPEN'
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                        : 'bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-200'
+                    }`}>
+                      {contract.status}
+                    </span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Clients Section - Only show in edit mode */}
         {isEditMode && projectId && (

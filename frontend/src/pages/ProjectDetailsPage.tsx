@@ -1,14 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Project, ProjectStatus } from '../types/project';
-import { Task } from '../types/task';
 import { Client } from '../types/client';
 import projectService from '../services/projectService';
-import { taskService } from '../services/taskService';
 import clientService from '../services/clientService';
 
 interface ProjectSectionsState {
-  isTasksExpanded: boolean;
   isClientsExpanded: boolean;
 }
 
@@ -16,14 +13,10 @@ const ProjectDetailsPage: React.FC = () => {
   const { companyId, projectId } = useParams<{ companyId: string; projectId: string }>();
   const navigate = useNavigate();
   const [project, setProject] = useState<Project | null>(null);
-  const [tasks, setTasks] = useState<Task[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isTasksExpanded, setIsTasksExpanded] = useState(true);
   const [isClientsExpanded, setIsClientsExpanded] = useState(true);
-  const [deleteTaskModalOpen, setDeleteTaskModalOpen] = useState(false);
-  const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
   const [deleteClientModalOpen, setDeleteClientModalOpen] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
@@ -42,34 +35,26 @@ const ProjectDetailsPage: React.FC = () => {
     if (projectId) {
       const savedState = localStorage.getItem(`project-sections-${projectId}`);
       if (savedState) {
-        const { isTasksExpanded, isClientsExpanded } = JSON.parse(savedState) as ProjectSectionsState;
-        setIsTasksExpanded(isTasksExpanded ?? true);
+        const { isClientsExpanded } = JSON.parse(savedState) as ProjectSectionsState;
         setIsClientsExpanded(isClientsExpanded ?? true);
       }
     }
   }, [projectId]);
 
   // Save sections state to localStorage
-  const saveSectionsState = (tasksExpanded: boolean, clientsExpanded: boolean) => {
+  const saveSectionsState = (clientsExpanded: boolean) => {
     if (projectId) {
       const state: ProjectSectionsState = {
-        isTasksExpanded: tasksExpanded,
         isClientsExpanded: clientsExpanded,
       };
       localStorage.setItem(`project-sections-${projectId}`, JSON.stringify(state));
     }
   };
 
-  // Update tasks expanded state
-  const handleTasksToggle = (expanded: boolean) => {
-    setIsTasksExpanded(expanded);
-    saveSectionsState(expanded, isClientsExpanded);
-  };
-
   // Update clients expanded state
   const handleClientsToggle = (expanded: boolean) => {
     setIsClientsExpanded(expanded);
-    saveSectionsState(isTasksExpanded, expanded);
+    saveSectionsState(expanded);
   };
 
   useEffect(() => {
@@ -86,13 +71,11 @@ const ProjectDetailsPage: React.FC = () => {
       try {
         setIsLoading(true);
         setError(null);
-        const [projectData, tasksData, clientsData] = await Promise.all([
+        const [projectData, clientsData] = await Promise.all([
           projectService.getProjectById(companyIdNum, projectIdNum),
-          taskService.getTasks(projectIdNum),
           clientService.getAllClientsByProjectId(projectIdNum)
         ]);
         setProject(projectData);
-        setTasks(tasksData.content);
         setClients(clientsData);
       } catch (err) {
         console.error('Error fetching project details:', err);
@@ -104,30 +87,6 @@ const ProjectDetailsPage: React.FC = () => {
 
     fetchData();
   }, [companyId, projectId]);
-
-  const handleDeleteTask = async (taskId: number) => {
-    if (!companyId || !projectId) return;
-
-    try {
-      await taskService.deleteTask(parseInt(projectId, 10), taskId);
-      setTasks(tasks.filter(task => task.id !== taskId));
-      setDeleteTaskModalOpen(false);
-      setTaskToDelete(null);
-    } catch (err) {
-      console.error('Error deleting task:', err);
-      setError('Failed to delete task');
-    }
-  };
-
-  const openDeleteTaskModal = (task: Task) => {
-    setTaskToDelete(task);
-    setDeleteTaskModalOpen(true);
-  };
-
-  const closeDeleteTaskModal = () => {
-    setDeleteTaskModalOpen(false);
-    setTaskToDelete(null);
-  };
 
   const handleDeleteClient = async (clientId: number) => {
     if (!projectId) return;
@@ -237,41 +196,6 @@ const ProjectDetailsPage: React.FC = () => {
 
   return (
     <div className="container mx-auto p-4">
-      {/* Delete Task Confirmation Modal */}
-      {deleteTaskModalOpen && taskToDelete && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center">
-          <div className="relative p-5 border w-96 shadow-lg rounded-md bg-white dark:bg-gray-800">
-            <div className="mt-3 text-center">
-              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900">
-                <svg className="h-6 w-6 text-red-600 dark:text-red-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </div>
-              <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white mt-2">Delete Task</h3>
-              <div className="mt-2 px-7 py-3">
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Are you sure you want to delete the task "{taskToDelete.title}"? This action cannot be undone.
-                </p>
-              </div>
-              <div className="flex justify-center space-x-4 mt-4">
-                <button
-                  onClick={closeDeleteTaskModal}
-                  className="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => handleDeleteTask(taskToDelete.id!)}
-                  className="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Project Details Section */}
       <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6 mb-6">
         <div className="flex justify-between items-start mb-4">
@@ -542,106 +466,6 @@ const ProjectDetailsPage: React.FC = () => {
         )}
       </div>
 
-      {/* Tasks Section */}
-      <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6">
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex items-center">
-            <button
-              onClick={() => handleTasksToggle(!isTasksExpanded)}
-              className="mr-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-            >
-              <svg
-                className={`w-5 h-5 transform transition-transform ${isTasksExpanded ? 'rotate-90' : ''}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Tasks</h2>
-          </div>
-          <button
-            onClick={() => navigate(`/companies/${companyId}/projects/${projectId}/tasks/new`)}
-            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md transition-colors"
-          >
-            Create New Task
-          </button>
-        </div>
-
-        {isTasksExpanded && (
-          <>
-            {tasks.length === 0 ? (
-              <div className="text-center text-gray-500 dark:text-gray-400 mt-4">
-                No tasks found. Create your first task!
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                  <thead className="bg-gray-50 dark:bg-gray-700">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Title</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Start Date</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Hours</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                    {tasks.map((task) => (
-                      <tr key={task.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">
-                            {task.title}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-500 dark:text-gray-300">
-                            {task.startDate ? new Date(task.startDate).toLocaleDateString() : '-'}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-500 dark:text-gray-300">
-                            {task.hoursWorked} hours
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex space-x-2">
-                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                              task.isBilled ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                            }`}>
-                              {task.isBilled ? 'Billed' : 'Unbilled'}
-                            </span>
-                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                              task.isPaid ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                            }`}>
-                              {task.isPaid ? 'Paid' : 'Unpaid'}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <button
-                            onClick={() => navigate(`/companies/${companyId}/projects/${projectId}/tasks/${task.id}/edit`)}
-                            className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-4"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => openDeleteTaskModal(task)}
-                            className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                          >
-                            Delete
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </>
-        )}
-      </div>
     </div>
   );
 };

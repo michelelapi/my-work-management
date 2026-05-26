@@ -187,8 +187,10 @@ export const taskService = {
         userPhone?: string,
         userEmailAddress?: string,
         projectName?: string,
-        skipReminderCheck: boolean = false
-    ): Promise<Blob> {
+        skipReminderCheck: boolean = false,
+        taskIds?: number[],
+        contractId?: number
+    ): Promise<{ blob: Blob; contentType: string; filename: string }> {
         const params: any = { year, month };
         if (projectId !== undefined) {
             params.projectId = projectId;
@@ -208,11 +210,24 @@ export const taskService = {
         if (projectName) {
             params.projectName = projectName;
         }
+        if (taskIds && taskIds.length > 0) {
+            params.taskIds = taskIds.join(',');
+        }
+        if (contractId !== undefined) {
+            params.contractId = contractId;
+        }
         const response = await api.get('/tasks/sal/pdf', {
             params,
             responseType: 'blob',
             ...(skipReminderCheck ? { _skipReminderCheck: true } : {})
         });
-        return response.data;
+        const contentType = response.headers['content-type'] || 'application/pdf';
+        const disposition = response.headers['content-disposition'] || '';
+        const filenameMatch = disposition.match(/filename="?([^";\s]+)"?/);
+        const isZip = contentType.includes('zip');
+        const extension = isZip ? '.zip' : '.pdf';
+        const defaultFilename = `SAL_${year}_${String(month).padStart(2, '0')}${extension}`;
+        const filename = filenameMatch ? filenameMatch[1] : defaultFilename;
+        return { blob: response.data, contentType, filename };
     }
 }; 

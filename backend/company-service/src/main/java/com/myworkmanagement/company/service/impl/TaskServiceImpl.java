@@ -1,16 +1,22 @@
 package com.myworkmanagement.company.service.impl;
 
 import com.myworkmanagement.company.dto.TaskBillingStatusUpdateDTO;
+import com.myworkmanagement.company.dto.TaskContractUsageDTO;
 import com.myworkmanagement.company.dto.TaskDTO;
 import com.myworkmanagement.company.dto.TaskPaymentStatusUpdateDTO;
 import com.myworkmanagement.company.entity.Client;
+import com.myworkmanagement.company.entity.Contract;
+import com.myworkmanagement.company.entity.ContractStatus;
 import com.myworkmanagement.company.entity.Project;
 import com.myworkmanagement.company.entity.Task;
+import com.myworkmanagement.company.entity.TaskContractUsage;
 import com.myworkmanagement.company.exception.ResourceNotFoundException;
 import com.myworkmanagement.company.exception.TaskBillingStatusException;
 import com.myworkmanagement.company.exception.TaskPaymentStatusException;
 import com.myworkmanagement.company.repository.ClientRepository;
+import com.myworkmanagement.company.repository.ContractRepository;
 import com.myworkmanagement.company.repository.ProjectRepository;
+import com.myworkmanagement.company.repository.TaskContractUsageRepository;
 import com.myworkmanagement.company.repository.TaskRepository;
 import com.myworkmanagement.company.service.GoogleSheetsService;
 import com.myworkmanagement.company.service.TaskService;
@@ -22,6 +28,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.time.Year;
@@ -38,6 +45,8 @@ public class TaskServiceImpl implements TaskService {
     private final TaskRepository taskRepository;
     private final ProjectRepository projectRepository;
     private final ClientRepository clientRepository;
+    private final ContractRepository contractRepository;
+    private final TaskContractUsageRepository taskContractUsageRepository;
     private final GoogleSheetsService googleSheetsService;
     private static final Logger logger = LoggerFactory.getLogger(TaskServiceImpl.class);
     private static final SecureRandom random = new SecureRandom();
@@ -466,10 +475,20 @@ public class TaskServiceImpl implements TaskService {
             Task task = taskRepository.findById(update.getTaskId())
                 .orElseThrow(() -> new TaskBillingStatusException("Task not found with id: " + update.getTaskId()));
             
+            boolean wasBilled = Boolean.TRUE.equals(task.getIsBilled());
+            boolean nowBilled = Boolean.TRUE.equals(update.getIsBilled());
+
             task.setIsBilled(update.getIsBilled());
             task.setBillingDate(update.getIsBilled()?update.getBillingDate():null);
             task.setInvoiceId(update.getIsBilled()?update.getInvoiceId():null);
             Task savedTask = taskRepository.save(task);
+
+            if (nowBilled && !wasBilled) {
+                allocateTaskCostToContracts(savedTask);
+            } else if (!nowBilled && wasBilled) {
+                reverseTaskContractUsages(savedTask);
+            }
+
             updatedTasks.add(convertToDTO(savedTask));
 
             googleSheetsService.updateTaskRowByTicketId(savedTask.getTicketId(), mapTaskToSheetRow(savedTask))
@@ -479,8 +498,66 @@ public class TaskServiceImpl implements TaskService {
             });
         }
 
-
         return updatedTasks;
+    }
+
+    private void allocateTaskCostToContracts(Task task) {
+        BigDecimal hours = task.getHoursWorked() != null ? task.getHoursWorked() : BigDecimal.ZERO;
+        BigDecimal rate = task.getRateUsed() != null ? task.getRateUsed() : BigDecimal.ZERO;
+        BigDecimal taskCost = hours.multiply(rate);
+
+        if (taskCost.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+
+        List<Contract> openContracts = contractRepository.findByProjectIdAndStatus(
+                task.getProject().getId(), ContractStatus.OPEN);
+
+        if (openContracts.isEmpty()) {
+            return;
+        }
+
+        BigDecimal remaining = taskCost;
+
+        for (Contract contract : openContracts) {
+            if (remaining.compareTo(BigDecimal.ZERO) <= 0) {
+                break;
+            }
+
+            BigDecimal available = contract.getAmountAvailable();
+            BigDecimal deduction = remaining.min(available);
+
+            contract.setAmountAvailable(available.subtract(deduction));
+            if (contract.getAmountAvailable().compareTo(BigDecimal.ZERO) <= 0) {
+                contract.setAmountAvailable(BigDecimal.ZERO);
+                contract.setStatus(ContractStatus.COMPLETED);
+            }
+            contractRepository.save(contract);
+
+            TaskContractUsage usage = TaskContractUsage.builder()
+                    .task(task)
+                    .contract(contract)
+                    .amountUsed(deduction)
+                    .contractCode(contract.getCode())
+                    .build();
+            taskContractUsageRepository.save(usage);
+
+            remaining = remaining.subtract(deduction);
+        }
+    }
+
+    private void reverseTaskContractUsages(Task task) {
+        List<TaskContractUsage> usages = taskContractUsageRepository.findByTaskId(task.getId());
+        for (TaskContractUsage usage : usages) {
+            Contract contract = usage.getContract();
+            contract.setAmountAvailable(contract.getAmountAvailable().add(usage.getAmountUsed()));
+            if (contract.getAmountAvailable().compareTo(BigDecimal.ZERO) > 0
+                    && contract.getStatus() == ContractStatus.COMPLETED) {
+                contract.setStatus(ContractStatus.OPEN);
+            }
+            contractRepository.save(contract);
+        }
+        taskContractUsageRepository.deleteByTaskId(task.getId());
     }
 
     @Override
@@ -532,10 +609,20 @@ public class TaskServiceImpl implements TaskService {
                 .createdAt(task.getCreatedAt())
                 .updatedAt(task.getUpdatedAt());
         
-        // Map client relationship
         if (task.getClient() != null) {
             builder.clientId(task.getClient().getId())
                    .clientName(task.getClient().getName());
+        }
+
+        List<TaskContractUsage> usages = taskContractUsageRepository.findByTaskId(task.getId());
+        if (usages != null && !usages.isEmpty()) {
+            builder.contractUsages(usages.stream()
+                    .map(u -> TaskContractUsageDTO.builder()
+                            .contractId(u.getContract().getId())
+                            .contractCode(u.getContractCode())
+                            .amountUsed(u.getAmountUsed())
+                            .build())
+                    .collect(Collectors.toList()));
         }
         
         return builder.build();

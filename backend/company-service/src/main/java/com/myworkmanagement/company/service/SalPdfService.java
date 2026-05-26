@@ -1,5 +1,6 @@
 package com.myworkmanagement.company.service;
 
+import com.myworkmanagement.company.dto.TaskContractUsageDTO;
 import com.myworkmanagement.company.dto.TaskDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -102,6 +103,14 @@ public class SalPdfService {
     public byte[] generateSalPdf(List<TaskDTO> tasks, String userEmail, String userName, 
                                  String userAddress, String userPhone, String userEmailAddress,
                                  String projectName, LocalDate reportMonth) throws IOException {
+        return generateSalPdf(tasks, userEmail, userName, userAddress, userPhone, 
+            userEmailAddress, projectName, reportMonth, null, null);
+    }
+
+    public byte[] generateSalPdf(List<TaskDTO> tasks, String userEmail, String userName, 
+                                 String userAddress, String userPhone, String userEmailAddress,
+                                 String projectName, LocalDate reportMonth,
+                                 String contractCode, java.math.BigDecimal contractAmountAvailable) throws IOException {
         
         if (tasks == null || tasks.isEmpty()) {
             throw new IllegalArgumentException("Cannot generate SAL PDF: no tasks provided");
@@ -285,6 +294,21 @@ public class SalPdfService {
             contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 10);
             contentStream.newLineAtOffset(margin, yPosition);
             contentStream.showText(line);
+            contentStream.endText();
+            yPosition -= 15;
+        }
+
+        // Contract info
+        if (contractCode != null && !contractCode.isEmpty()) {
+            yPosition -= 5;
+            String contractInfo = "Contratto: " + sanitizeTextForPdf(contractCode);
+            if (contractAmountAvailable != null) {
+                contractInfo += " - Importo residuo: " + formatItalianNumber(contractAmountAvailable) + " EUR";
+            }
+            contentStream.beginText();
+            contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 10);
+            contentStream.newLineAtOffset(margin, yPosition);
+            contentStream.showText(contractInfo);
             contentStream.endText();
             yPosition -= 15;
         }
@@ -479,6 +503,27 @@ public class SalPdfService {
                 contentStream.newLineAtOffset(col5X, rowStartY);
                 contentStream.showText(formatItalianNumber(amountWithVat));
                 contentStream.endText();
+
+                // Contract usage sub-rows
+                if (task.getContractUsages() != null && !task.getContractUsages().isEmpty()) {
+                    for (TaskContractUsageDTO usage : task.getContractUsages()) {
+                        yPosition -= 12;
+                        if (yPosition < 100) {
+                            contentStream.close();
+                            PDPage contractPage = new PDPage();
+                            document.addPage(contractPage);
+                            contentStream = new PDPageContentStream(document, contractPage);
+                            yPosition = pageHeight - margin - 40;
+                        }
+                        String contractInfo = "Contratto: " + sanitizeTextForPdf(usage.getContractCode())
+                                + " - Importo: " + formatItalianNumber(usage.getAmountUsed());
+                        contentStream.beginText();
+                        contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_OBLIQUE), 7);
+                        contentStream.newLineAtOffset(col2X + 10, yPosition);
+                        contentStream.showText(contractInfo);
+                        contentStream.endText();
+                    }
+                }
 
                 // Add to client subtotals
                 clientHours = clientHours.add(hours);

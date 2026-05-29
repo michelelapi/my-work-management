@@ -11,6 +11,7 @@ import { FaPen } from "@react-icons/all-files/fa/FaPen"
 import { FaTrash } from "@react-icons/all-files/fa/FaTrash"
 import { FaCheck } from "@react-icons/all-files/fa/FaCheck"
 import { FaFilePdf } from "@react-icons/all-files/fa/FaFilePdf"
+import { FaBell } from "@react-icons/all-files/fa/FaBell"
 import ProjectSummary from '../components/ProjectSummary';
 import TaskFilters from '../components/TaskFilters';
 import TaskActionButtons from '../components/TaskActionButtons';
@@ -854,6 +855,15 @@ const TaskListPage: React.FC = () => {
         });
     };
 
+    const handleCreateNewTask = async () => {
+        const createTaskPath = projectId ? `/projects/${projectId}/tasks` : '/projects/1/tasks';
+        const shouldProceed = await runReminderPreflightGate('POST', createTaskPath);
+        if (!shouldProceed) {
+            return;
+        }
+        navigate('/tasks/new');
+    };
+
     // Handle SAL PDF generation - uses filtered tasks
     const handleGenerateSal = async () => {
         try {
@@ -1149,9 +1159,17 @@ const TaskListPage: React.FC = () => {
 
                     {/* Add New Task Button - Right Side */}
                     <button
-                        onClick={() => navigate('/tasks/new')}
-                        className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2.5 rounded-md transition-colors font-medium shadow-md hover:shadow-lg flex items-center"
+                        onClick={handleCreateNewTask}
+                        className="relative bg-blue-500 hover:bg-blue-600 text-white px-6 py-2.5 rounded-md transition-colors font-medium shadow-md hover:shadow-lg flex items-center"
                     >
+                        {activeReminderActivities.has('Create New Task') && (
+                            <span
+                                className="absolute -top-1 -right-1 bg-red-500 rounded-full p-1 shadow-sm"
+                                title="Active reminder"
+                            >
+                                <FaBell className="text-white text-[10px]" />
+                            </span>
+                        )}
                         Create New Task
                     </button>
                 </div>

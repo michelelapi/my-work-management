@@ -140,9 +140,21 @@ public class ActivityReminderServiceImpl implements ActivityReminderService {
     }
 
     private boolean pathMatches(String pattern, String actualPath) {
-        String escaped = Pattern.quote(pattern);
-        String regex = escaped.replaceAll("\\\\\\{[^/]+\\\\\\}", "\\\\E[^/]+\\\\Q");
-        return actualPath.matches("^" + regex + "$");
+        StringBuilder regex = new StringBuilder("^");
+        int segmentStart = 0;
+        int openBrace;
+        while ((openBrace = pattern.indexOf('{', segmentStart)) >= 0) {
+            int closeBrace = pattern.indexOf('}', openBrace);
+            if (closeBrace < 0) {
+                break;
+            }
+            regex.append(Pattern.quote(pattern.substring(segmentStart, openBrace)));
+            regex.append("[^/]+");
+            segmentStart = closeBrace + 1;
+        }
+        regex.append(Pattern.quote(pattern.substring(segmentStart)));
+        regex.append("$");
+        return actualPath.matches(regex.toString());
     }
 
     private ActivityReminderDTO mapToDTO(ActivityReminder reminder) {

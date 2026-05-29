@@ -10,6 +10,8 @@ import java.util.Optional;
 
 @Repository
 public interface ActivityReminderRepository extends JpaRepository<ActivityReminder, Long> {
+    Page<ActivityReminder> findByUserEmail(String userEmail, Pageable pageable);
+
     Page<ActivityReminder> findByUserEmailAndActiveTrue(String userEmail, Pageable pageable);
 
     Optional<ActivityReminder> findByIdAndUserEmail(Long id, String userEmail);

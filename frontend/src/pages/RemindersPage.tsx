@@ -15,7 +15,13 @@ const RemindersPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   const sortedReminders = useMemo(
-    () => [...reminders].sort((a, b) => new Date(b.creationDate).getTime() - new Date(a.creationDate).getTime()),
+    () =>
+      [...reminders].sort((a, b) => {
+        if (a.active !== b.active) {
+          return a.active ? -1 : 1;
+        }
+        return new Date(b.creationDate).getTime() - new Date(a.creationDate).getTime();
+      }),
     [reminders]
   );
 
@@ -29,7 +35,7 @@ const RemindersPage: React.FC = () => {
       setError(null);
       const [fetchedActivities, fetchedReminders] = await Promise.all([
         reminderService.getActivities(),
-        reminderService.getReminders(0, 200, 'creationDate,desc')
+        reminderService.getReminders(0, 200, 'creationDate,desc', false)
       ]);
 
       setActivities(fetchedActivities);
@@ -81,8 +87,8 @@ const RemindersPage: React.FC = () => {
   const handleCompleteReminder = async (reminderId: number) => {
     try {
       setError(null);
-      await reminderService.completeReminder(reminderId);
-      setReminders((prev) => prev.filter((item) => item.id !== reminderId));
+      const completed = await reminderService.completeReminder(reminderId);
+      setReminders((prev) => prev.map((item) => (item.id === reminderId ? completed : item)));
       dispatchRemindersUpdatedEvent();
     } catch (err) {
       console.error('Error completing reminder:', err);
@@ -147,13 +153,14 @@ const RemindersPage: React.FC = () => {
 
       {sortedReminders.length === 0 ? (
         <div className="text-center text-gray-500 dark:text-gray-400 mt-10">
-          No active reminders found.
+          No reminders found.
         </div>
       ) : (
         <div className="overflow-x-auto bg-white dark:bg-gray-800 shadow-md rounded-lg">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-700">
               <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Created</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Activity</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Message</th>
@@ -162,24 +169,49 @@ const RemindersPage: React.FC = () => {
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {sortedReminders.map((reminder) => (
-                <tr key={reminder.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    {new Date(reminder.creationDate).toLocaleString()}
+                <tr
+                  key={reminder.id}
+                  className={
+                    reminder.active
+                      ? 'hover:bg-gray-50 dark:hover:bg-gray-700'
+                      : 'bg-gray-50/80 dark:bg-gray-900/40 text-gray-500 dark:text-gray-400'
+                  }
+                >
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    {reminder.active ? (
+                      <span className="inline-flex rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900 dark:text-green-200">
+                        Active
+                      </span>
+                    ) : (
+                      <span className="inline-flex rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-600 dark:text-gray-200">
+                        Completed
+                      </span>
+                    )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <div>{new Date(reminder.creationDate).toLocaleString()}</div>
+                    {!reminder.active && reminder.completedDate && (
+                      <div className="text-xs mt-1">
+                        Done: {new Date(reminder.completedDate).toLocaleString()}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
                     {reminder.activityName}
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
+                  <td className="px-6 py-4 text-sm">
                     {reminder.message}
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button
-                      onClick={() => handleCompleteReminder(reminder.id)}
-                      className="text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300"
-                      title="Mark as done"
-                    >
-                      <FaCheck size={16} className="inline-block" />
-                    </button>
+                    {reminder.active && (
+                      <button
+                        onClick={() => handleCompleteReminder(reminder.id)}
+                        className="text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300"
+                        title="Mark as done"
+                      >
+                        <FaCheck size={16} className="inline-block" />
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

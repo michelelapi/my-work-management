@@ -44,16 +44,19 @@ public class ActivityReminderController {
     }
 
     @GetMapping("/reminders")
-    @Operation(summary = "Get active reminders", description = "Retrieves active reminders for authenticated user")
+    @Operation(summary = "Get reminders", description = "Retrieves reminders for authenticated user; active reminders only by default")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Successfully retrieved reminders"),
             @ApiResponse(responseCode = "401", description = "Unauthorized")
     })
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
-    public ResponseEntity<Page<ActivityReminderDTO>> getReminders(Pageable pageable) {
+    public ResponseEntity<Page<ActivityReminderDTO>> getReminders(
+            Pageable pageable,
+            @Parameter(description = "When true, returns only active reminders", example = "true")
+            @RequestParam(defaultValue = "true") boolean activeOnly) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String userEmail = authentication.getName();
-        return ResponseEntity.ok(activityReminderService.getActiveReminders(userEmail, pageable));
+        return ResponseEntity.ok(activityReminderService.getReminders(userEmail, activeOnly, pageable));
     }
 
     @PostMapping("/reminders")

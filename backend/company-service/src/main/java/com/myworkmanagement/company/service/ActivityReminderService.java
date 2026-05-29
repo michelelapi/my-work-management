@@ -11,7 +11,7 @@ import java.util.List;
 public interface ActivityReminderService {
     List<String> getAvailableActivities();
 
-    Page<ActivityReminderDTO> getActiveReminders(String userEmail, Pageable pageable);
+    Page<ActivityReminderDTO> getReminders(String userEmail, boolean activeOnly, Pageable pageable);
 
     ActivityReminderDTO createReminder(String userEmail, ActivityReminderCreateDTO request);
 

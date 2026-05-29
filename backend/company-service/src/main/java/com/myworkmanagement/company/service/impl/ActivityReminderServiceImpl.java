@@ -40,11 +40,23 @@ public class ActivityReminderServiceImpl implements ActivityReminderService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<ActivityReminderDTO> getActiveReminders(String userEmail, Pageable pageable) {
-        Pageable effectivePageable = pageable.getSort().isSorted()
+    public Page<ActivityReminderDTO> getReminders(String userEmail, boolean activeOnly, Pageable pageable) {
+        Pageable effectivePageable;
+        if (activeOnly) {
+            effectivePageable = pageable.getSort().isSorted()
+                    ? pageable
+                    : PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by(Sort.Direction.DESC, "creationDate"));
+            return activityReminderRepository.findByUserEmailAndActiveTrue(userEmail, effectivePageable).map(this::mapToDTO);
+        }
+
+        effectivePageable = pageable.getSort().isSorted()
                 ? pageable
-                : PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by(Sort.Direction.DESC, "creationDate"));
-        return activityReminderRepository.findByUserEmailAndActiveTrue(userEmail, effectivePageable).map(this::mapToDTO);
+                : PageRequest.of(
+                        pageable.getPageNumber(),
+                        pageable.getPageSize(),
+                        Sort.by(Sort.Order.desc("active"), Sort.Order.desc("creationDate"))
+                );
+        return activityReminderRepository.findByUserEmail(userEmail, effectivePageable).map(this::mapToDTO);
     }
 
     @Override

@@ -11,9 +11,14 @@ const reminderService = {
     return response.data || [];
   },
 
-  async getReminders(page: number = 0, size: number = 100, sort: string = 'creationDate,desc'): Promise<ActivityReminder[]> {
+  async getReminders(
+    page: number = 0,
+    size: number = 100,
+    sort: string = 'creationDate,desc',
+    activeOnly: boolean = true
+  ): Promise<ActivityReminder[]> {
     const response = await api.get<PageResponse<ActivityReminder>>('/reminders', {
-      params: { page, size, sort }
+      params: { page, size, sort, activeOnly }
     });
     return response.data.content || [];
   },

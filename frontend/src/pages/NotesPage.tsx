@@ -1,10 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { FaChevronDown } from "@react-icons/all-files/fa/FaChevronDown";
+import { FaChevronUp } from "@react-icons/all-files/fa/FaChevronUp";
 import { FaTrash } from "@react-icons/all-files/fa/FaTrash";
 import NotesModal from '../components/NotesModal';
 import noteService from '../services/noteService';
 import { Note } from '../types/note';
 
 const NOTES_UPDATED_EVENT = 'notes-updated';
+const NOTE_PREVIEW_LINES = 3;
+const NOTE_COLLAPSE_CHAR_THRESHOLD = 200;
+
+const isLongNote = (content: string): boolean =>
+  content.split('\n').length > NOTE_PREVIEW_LINES || content.length > NOTE_COLLAPSE_CHAR_THRESHOLD;
 
 const NotesPage: React.FC = () => {
   const [notes, setNotes] = useState<Note[]>([]);
@@ -16,7 +23,7 @@ const NotesPage: React.FC = () => {
 
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
-
+  const [expandedNoteIds, setExpandedNoteIds] = useState<Set<number>>(new Set());
   const sortedNotes = useMemo(
     () => [...notes].sort((a, b) => new Date(b.creationDate).getTime() - new Date(a.creationDate).getTime()),
     [notes]
@@ -89,6 +96,19 @@ const NotesPage: React.FC = () => {
     }
   };
 
+  const handleToggleNoteExpanded = (noteId: number, event: React.MouseEvent) => {
+    event.stopPropagation();
+    setExpandedNoteIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(noteId)) {
+        next.delete(noteId);
+      } else {
+        next.add(noteId);
+      }
+      return next;
+    });
+  };
+
   const handleDeleteNote = async (note: Note) => {
     const confirmed = window.confirm('Are you sure you want to delete this note?');
     if (!confirmed) {
@@ -147,7 +167,11 @@ const NotesPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {sortedNotes.map((note) => (
+              {sortedNotes.map((note) => {
+                const isExpanded = expandedNoteIds.has(note.id);
+                const showExpandToggle = isLongNote(note.content);
+
+                return (
                 <tr
                   key={note.id}
                   className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
@@ -168,7 +192,26 @@ const NotesPage: React.FC = () => {
                     {note.readDate ? new Date(note.readDate).toLocaleString() : '-'}
                   </td>
                   <td className="w-auto px-6 py-4 text-sm text-gray-900 dark:text-white">
-                    <div className="w-full truncate" title={note.content}>{note.content}</div>
+                    <div className="flex items-start gap-2">
+                      <div
+                        className={`flex-1 whitespace-pre-wrap break-words ${
+                          !isExpanded && showExpandToggle ? 'line-clamp-3' : ''
+                        }`}
+                      >
+                        {note.content}
+                      </div>
+                      {showExpandToggle && (
+                        <button
+                          type="button"
+                          onClick={(e) => handleToggleNoteExpanded(note.id, e)}
+                          className="shrink-0 mt-0.5 inline-flex items-center justify-center rounded-md border border-blue-200 bg-blue-50 p-1.5 text-blue-600 shadow-sm transition-colors hover:border-blue-300 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 dark:border-blue-700 dark:bg-blue-900/40 dark:text-blue-300 dark:hover:border-blue-600 dark:hover:bg-blue-900/70 dark:focus:ring-offset-gray-800"
+                          title={isExpanded ? 'Collapse note' : 'Expand note'}
+                          aria-label={isExpanded ? 'Collapse note' : 'Expand note'}
+                        >
+                          {isExpanded ? <FaChevronUp size={16} /> : <FaChevronDown size={16} />}
+                        </button>
+                      )}
+                    </div>
                   </td>
                   <td className="w-20 px-6 py-4 text-right text-sm font-medium" onClick={(e) => e.stopPropagation()}>
                     <button
@@ -180,7 +223,8 @@ const NotesPage: React.FC = () => {
                     </button>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

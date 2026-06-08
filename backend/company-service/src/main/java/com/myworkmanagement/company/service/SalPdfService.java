@@ -487,9 +487,11 @@ public class SalPdfService {
                 contentStream.showText(formatItalianNumber(hours));
                 contentStream.endText();
 
-                // Amount (hours * rate) - aligned to top of row
+                // Amount: use exact billable amount when set (contract budget split), else hours * rate
                 BigDecimal rate = task.getRateUsed() != null ? task.getRateUsed() : BigDecimal.ZERO;
-                BigDecimal amount = hours.multiply(rate);
+                BigDecimal amount = task.getBillableAmount() != null
+                    ? task.getBillableAmount()
+                    : hours.multiply(rate);
                 contentStream.beginText();
                 contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 9);
                 contentStream.newLineAtOffset(col4X, rowStartY);

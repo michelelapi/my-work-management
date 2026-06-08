@@ -561,11 +561,12 @@ public class TaskController {
                     BigDecimal remaining = availableAmount.subtract(runningTotal);
                     if (remaining.compareTo(BigDecimal.ZERO) > 0 && rate.compareTo(BigDecimal.ZERO) > 0) {
                         BigDecimal adjustedHours = remaining.divide(rate, 2, RoundingMode.HALF_UP);
-                        contractTasks.add(copyTaskWithAdjustedHours(task, adjustedHours));
+                        contractTasks.add(copyTaskWithAdjustedHours(task, adjustedHours, remaining));
 
                         BigDecimal spillHours = hours.subtract(adjustedHours);
                         if (spillHours.compareTo(BigDecimal.ZERO) > 0) {
-                            nextRemaining.add(copyTaskWithAdjustedHours(task, spillHours));
+                            BigDecimal spillAmount = taskCost.subtract(remaining);
+                            nextRemaining.add(copyTaskWithAdjustedHours(task, spillHours, spillAmount));
                         }
                     } else {
                         nextRemaining.add(task);
@@ -595,15 +596,22 @@ public class TaskController {
         if (contract == null) return null;
         BigDecimal salTotal = BigDecimal.ZERO;
         for (TaskDTO t : salTasks) {
-            BigDecimal h = t.getHoursWorked() != null ? t.getHoursWorked() : BigDecimal.ZERO;
-            BigDecimal r = t.getRateUsed() != null ? t.getRateUsed() : BigDecimal.ZERO;
-            salTotal = salTotal.add(h.multiply(r));
+            salTotal = salTotal.add(resolveBillableAmount(t));
         }
         BigDecimal remaining = contract.getAmountAvailable().subtract(salTotal);
         return remaining.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : remaining;
     }
 
-    private TaskDTO copyTaskWithAdjustedHours(TaskDTO task, BigDecimal adjustedHours) {
+    private BigDecimal resolveBillableAmount(TaskDTO task) {
+        if (task.getBillableAmount() != null) {
+            return task.getBillableAmount();
+        }
+        BigDecimal h = task.getHoursWorked() != null ? task.getHoursWorked() : BigDecimal.ZERO;
+        BigDecimal r = task.getRateUsed() != null ? task.getRateUsed() : BigDecimal.ZERO;
+        return h.multiply(r);
+    }
+
+    private TaskDTO copyTaskWithAdjustedHours(TaskDTO task, BigDecimal adjustedHours, BigDecimal billableAmount) {
         return TaskDTO.builder()
             .id(task.getId())
             .projectId(task.getProjectId())
@@ -615,6 +623,7 @@ public class TaskController {
             .startDate(task.getStartDate())
             .endDate(task.getEndDate())
             .hoursWorked(adjustedHours)
+            .billableAmount(billableAmount)
             .rateUsed(task.getRateUsed())
             .type(task.getType())
             .currency(task.getCurrency())

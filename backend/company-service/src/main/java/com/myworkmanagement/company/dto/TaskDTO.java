@@ -100,4 +100,7 @@ public class TaskDTO {
 
     @Schema(description = "Contract usages for this task (populated when billed)")
     private List<TaskContractUsageDTO> contractUsages;
+
+    @Schema(description = "Exact billable amount for SAL (used when hours are adjusted for contract budget)")
+    private BigDecimal billableAmount;
 } 

@@ -41,7 +41,17 @@ const shouldSkipReminderCheck = (requestPath: string | null): boolean => {
   return requestPath.startsWith(REMINDER_ENDPOINT_PREFIX);
 };
 
-const showReminderPrompt = (message: string): Promise<boolean> => {
+type ReminderModalButton = {
+  label: string;
+  primary?: boolean;
+  onClick: () => void;
+};
+
+const showReminderModal = (
+  titleText: string,
+  message: string,
+  buttons: ReminderModalButton[]
+): Promise<void> => {
   return new Promise((resolve) => {
     const overlay = document.createElement('div');
     overlay.style.position = 'fixed';
@@ -64,7 +74,7 @@ const showReminderPrompt = (message: string): Promise<boolean> => {
     modal.style.fontFamily = 'sans-serif';
 
     const title = document.createElement('h3');
-    title.textContent = 'Reminder';
+    title.textContent = titleText;
     title.style.margin = '0 0 10px 0';
     title.style.fontSize = '18px';
     title.style.fontWeight = '600';
@@ -79,55 +89,86 @@ const showReminderPrompt = (message: string): Promise<boolean> => {
     actions.style.display = 'flex';
     actions.style.justifyContent = 'flex-end';
     actions.style.gap = '10px';
+    actions.style.flexWrap = 'wrap';
 
-    const cancelButton = document.createElement('button');
-    cancelButton.textContent = 'Cancel';
-    cancelButton.style.padding = '8px 14px';
-    cancelButton.style.border = '1px solid #9ca3af';
-    cancelButton.style.borderRadius = '6px';
-    cancelButton.style.background = '#f3f4f6';
-    cancelButton.style.cursor = 'pointer';
-
-    const proceedButton = document.createElement('button');
-    proceedButton.textContent = 'Proceed';
-    proceedButton.style.padding = '8px 14px';
-    proceedButton.style.border = 'none';
-    proceedButton.style.borderRadius = '6px';
-    proceedButton.style.background = '#2563eb';
-    proceedButton.style.color = '#ffffff';
-    proceedButton.style.cursor = 'pointer';
-
-    const cleanup = (result: boolean) => {
+    const cleanup = () => {
       document.removeEventListener('keydown', onEsc);
       if (overlay.parentNode) {
         overlay.parentNode.removeChild(overlay);
       }
-      resolve(result);
+      resolve();
     };
 
     const onEsc = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        cleanup(false);
+        const cancelButton = buttons[0];
+        cancelButton.onClick();
+        cleanup();
       }
     };
 
-    cancelButton.onclick = () => cleanup(false);
-    proceedButton.onclick = () => cleanup(true);
+    buttons.forEach((buttonConfig) => {
+      const button = document.createElement('button');
+      button.textContent = buttonConfig.label;
+      button.style.padding = '8px 14px';
+      button.style.borderRadius = '6px';
+      button.style.cursor = 'pointer';
+
+      if (buttonConfig.primary) {
+        button.style.border = 'none';
+        button.style.background = '#2563eb';
+        button.style.color = '#ffffff';
+      } else {
+        button.style.border = '1px solid #9ca3af';
+        button.style.background = '#f3f4f6';
+      }
+
+      button.onclick = () => {
+        buttonConfig.onClick();
+        cleanup();
+      };
+      actions.appendChild(button);
+    });
+
     overlay.onclick = (event) => {
       if (event.target === overlay) {
-        cleanup(false);
+        buttons[0].onClick();
+        cleanup();
       }
     };
 
     document.addEventListener('keydown', onEsc);
 
-    actions.appendChild(cancelButton);
-    actions.appendChild(proceedButton);
     modal.appendChild(title);
     modal.appendChild(content);
     modal.appendChild(actions);
     overlay.appendChild(modal);
     document.body.appendChild(overlay);
+  });
+};
+
+const showReminderPrompt = (message: string): Promise<boolean> => {
+  return new Promise((resolve) => {
+    showReminderModal('Reminder', message, [
+      { label: 'Cancel', onClick: () => resolve(false) },
+      { label: 'Proceed', primary: true, onClick: () => resolve(true) }
+    ]);
+  });
+};
+
+type ReminderCompletionChoice = 'keep' | 'deactivate' | 'cancel';
+
+const showReminderCompletionPrompt = (): Promise<ReminderCompletionChoice> => {
+  return new Promise((resolve) => {
+    showReminderModal(
+      'Reminder',
+      'Do you want to keep this reminder active or deactivate it?',
+      [
+        { label: 'Cancel', onClick: () => resolve('cancel') },
+        { label: 'Keep reminder', onClick: () => resolve('keep') },
+        { label: 'Deactivate', primary: true, onClick: () => resolve('deactivate') }
+      ]
+    );
   });
 };
 
@@ -152,12 +193,19 @@ export const runReminderPreflightGate = async (method: string, requestPath: stri
       return false;
     }
 
-    await reminderApi.patch(`/reminders/${data.reminder.id}/complete`, undefined, {
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined
-    });
+    const completionChoice = await showReminderCompletionPrompt();
+    if (completionChoice === 'cancel') {
+      return false;
+    }
 
-    // Keep reminder indicators in sync across pages/components.
-    window.dispatchEvent(new Event('reminders-updated'));
+    if (completionChoice === 'deactivate') {
+      await reminderApi.patch(`/reminders/${data.reminder.id}/complete`, undefined, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined
+      });
+
+      // Keep reminder indicators in sync across pages/components.
+      window.dispatchEvent(new Event('reminders-updated'));
+    }
   }
 
   return true;

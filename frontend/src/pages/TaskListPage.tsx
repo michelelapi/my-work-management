@@ -12,6 +12,8 @@ import { FaTrash } from "@react-icons/all-files/fa/FaTrash"
 import { FaCheck } from "@react-icons/all-files/fa/FaCheck"
 import { FaFilePdf } from "@react-icons/all-files/fa/FaFilePdf"
 import { FaBell } from "@react-icons/all-files/fa/FaBell"
+import { FaChevronDown } from "@react-icons/all-files/fa/FaChevronDown"
+import { FaChevronUp } from "@react-icons/all-files/fa/FaChevronUp"
 import ProjectSummary from '../components/ProjectSummary';
 import TaskFilters from '../components/TaskFilters';
 import TaskActionButtons from '../components/TaskActionButtons';
@@ -38,6 +40,7 @@ const TaskListPage: React.FC = () => {
     const [searchParams, setSearchParams] = useSearchParams();
     const [tasks, setTasks] = useState<Task[]>([]);
     const [selectedTaskIds, setSelectedTaskIds] = useState<Set<number>>(new Set());
+    const [expandedStatusTaskIds, setExpandedStatusTaskIds] = useState<Set<number>>(new Set());
     const [allFilteredTasks, setAllFilteredTasks] = useState<Task[]>([]); // Store all filtered tasks for summary
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -138,6 +141,18 @@ const TaskListPage: React.FC = () => {
         navigator.clipboard.writeText(value);
         setCopiedField(field);
         setTimeout(() => setCopiedField(null), 1000);
+    };
+
+    const toggleStatusDetails = (taskId: number) => {
+        setExpandedStatusTaskIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(taskId)) {
+                next.delete(taskId);
+            } else {
+                next.add(taskId);
+            }
+            return next;
+        });
     };
 
     // Read URL query parameters on mount and when they change
@@ -1401,7 +1416,7 @@ const TaskListPage: React.FC = () => {
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/12 cursor-pointer" onClick={() => handleSort('ticketId')}>
                                     Task ID {sortField === 'ticketId' && (sortDirection === 'asc' ? '▲' : '▼')}
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-4/12 cursor-pointer" onClick={() => handleSort('title')}>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-3/12 cursor-pointer" onClick={() => handleSort('title')}>
                                     Title {sortField === 'title' && (sortDirection === 'asc' ? '▲' : '▼')}
                                 </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-2/12">
@@ -1416,7 +1431,7 @@ const TaskListPage: React.FC = () => {
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/12 cursor-pointer" onClick={() => handleSort('type')}>
                                     Type {sortField === 'type' && (sortDirection === 'asc' ? '▲' : '▼')}
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/12 cursor-pointer" onClick={() => handleSort('isBilled')}>
+                                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-2/12 cursor-pointer" onClick={() => handleSort('isBilled')}>
                                     Status {sortField === 'isBilled' && (sortDirection === 'asc' ? '▲' : '▼')}
                                 </th>
                                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/12">
@@ -1443,7 +1458,7 @@ const TaskListPage: React.FC = () => {
                                     <td className="px-6 py-4 break-words w-1/12">
                                         <div className="text-sm font-medium text-gray-900 dark:text-white">{task.ticketId}</div>
                                     </td>
-                                    <td className="px-6 py-4 w-4/12 max-w-0">
+                                    <td className="px-6 py-4 w-3/12 max-w-0">
                                         <div 
                                             className="text-sm text-gray-900 dark:text-white truncate"
                                             title={task.title}
@@ -1469,62 +1484,118 @@ const TaskListPage: React.FC = () => {
                                             {task.type || '-'}
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 break-words w-1/12">
-                                        <div className="flex space-x-2">
-                                            <span 
-                                                onClick={() => handleToggleBillingStatus(task)}
-                                                className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity ${
-                                                    getBillingStatus(task) === 'billed'
-                                                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                    <td className="px-3 py-4 break-words w-2/12">
+                                        <div className="flex flex-col gap-1.5 min-w-[7.5rem]">
+                                            <div className="grid grid-cols-2 gap-1 items-start">
+                                                <span 
+                                                    onClick={() => handleToggleBillingStatus(task)}
+                                                    className={`px-1.5 py-0.5 flex text-center justify-center text-xs font-semibold cursor-pointer hover:opacity-80 transition-opacity ${
+                                                        getBillingStatus(task) === 'partially_billed'
+                                                            ? 'w-full leading-tight whitespace-normal rounded-md'
+                                                            : 'whitespace-nowrap rounded-full'
+                                                    } ${
+                                                        getBillingStatus(task) === 'billed'
+                                                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                                            : getBillingStatus(task) === 'partially_billed'
+                                                            ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
+                                                            : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                                                    }`}
+                                                    title={
+                                                        getBillingStatus(task) === 'partially_billed'
+                                                            ? 'Click to bill the remaining portion'
+                                                            : 'Click to toggle billing status'
+                                                    }
+                                                >
+                                                    {getBillingStatus(task) === 'billed'
+                                                        ? 'Billed'
                                                         : getBillingStatus(task) === 'partially_billed'
-                                                        ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
-                                                        : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                                                }`}
-                                                title={
-                                                    getBillingStatus(task) === 'partially_billed'
-                                                        ? 'Click to bill the remaining portion'
-                                                        : 'Click to toggle billing status'
-                                                }
-                                            >
-                                                {getBillingStatus(task) === 'billed'
-                                                    ? 'Billed'
-                                                    : getBillingStatus(task) === 'partially_billed'
-                                                    ? 'Partially Billed'
-                                                    : 'Unbilled'}
-                                            </span>
-                                            <span 
-                                                onClick={() => handleTogglePaymentStatus(task)}
-                                                className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity ${
-                                                    getPaymentStatus(task) === 'paid'
-                                                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                                        ? 'Partially Billed'
+                                                        : 'Unbilled'}
+                                                </span>
+                                                <span 
+                                                    onClick={() => handleTogglePaymentStatus(task)}
+                                                    className={`px-1.5 py-0.5 flex text-center justify-center text-xs font-semibold cursor-pointer hover:opacity-80 transition-opacity ${
+                                                        getPaymentStatus(task) === 'partially_paid'
+                                                            ? 'w-full leading-tight whitespace-normal rounded-md'
+                                                            : 'whitespace-nowrap rounded-full'
+                                                    } ${
+                                                        getPaymentStatus(task) === 'paid'
+                                                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                                            : getPaymentStatus(task) === 'partially_paid'
+                                                            ? 'bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-200'
+                                                            : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                                                    }`}
+                                                    title={
+                                                        getPaymentStatus(task) === 'partially_paid'
+                                                            ? 'Click to pay the remaining portion'
+                                                            : 'Click to toggle payment status'
+                                                    }
+                                                >
+                                                    {getPaymentStatus(task) === 'paid'
+                                                        ? 'Paid'
                                                         : getPaymentStatus(task) === 'partially_paid'
-                                                        ? 'bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-200'
-                                                        : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                                                }`}
-                                                title={
-                                                    getPaymentStatus(task) === 'partially_paid'
-                                                        ? 'Click to pay the remaining portion'
-                                                        : 'Click to toggle payment status'
-                                                }
-                                            >
-                                                {getPaymentStatus(task) === 'paid'
-                                                    ? 'Paid'
-                                                    : getPaymentStatus(task) === 'partially_paid'
-                                                    ? 'Partially Paid'
-                                                    : 'Unpaid'}
-                                            </span>
-                                        </div>
-                                        {(task.isBilled || task.isPartiallyBilled || task.isPaid || task.isPartiallyPaid) && task.contractUsages && task.contractUsages.length > 0 && (
-                                            <div className="mt-1 space-y-0.5">
-                                                {task.contractUsages.map((cu, idx) => (
-                                                    <div key={idx} className="text-xs text-gray-500 dark:text-gray-400">
-                                                        <span className="font-mono">{cu.contractCode}</span>: {cu.amountUsed.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                        {cu.invoiceId ? ` · bill ${cu.invoiceId}` : ' · bill pending'}
-                                                        {cu.paymentDate ? ` · paid ${cu.paymentDate.split('T')[0]}` : (cu.isBilled || cu.invoiceId ? ' · pay pending' : '')}
-                                                    </div>
-                                                ))}
+                                                        ? 'Partially Paid'
+                                                        : 'Unpaid'}
+                                                </span>
                                             </div>
-                                        )}
+                                            {(task.isBilled || task.isPartiallyBilled || task.isPaid || task.isPartiallyPaid) && task.contractUsages && task.contractUsages.length > 0 && task.id !== undefined && (
+                                                <>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => toggleStatusDetails(task.id!)}
+                                                        className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors w-fit"
+                                                        aria-expanded={expandedStatusTaskIds.has(task.id)}
+                                                        aria-label={expandedStatusTaskIds.has(task.id) ? 'Hide billing details' : 'Show billing details'}
+                                                    >
+                                                        {expandedStatusTaskIds.has(task.id)
+                                                            ? <FaChevronUp size={10} className="shrink-0" />
+                                                            : <FaChevronDown size={10} className="shrink-0" />}
+                                                        <span>
+                                                            {task.contractUsages.length} contract{task.contractUsages.length > 1 ? 's' : ''}
+                                                        </span>
+                                                    </button>
+                                                    {expandedStatusTaskIds.has(task.id) && (
+                                                        <div className="rounded-md border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/50 p-2 space-y-1.5">
+                                                            {task.contractUsages.map((cu, idx) => (
+                                                                <div
+                                                                    key={idx}
+                                                                    className="text-xs border-b border-gray-200 dark:border-gray-600 last:border-0 last:pb-0 pb-1.5"
+                                                                >
+                                                                    <div className="flex items-center justify-between gap-2">
+                                                                        <span className="font-mono font-medium text-gray-800 dark:text-gray-200">
+                                                                            {cu.contractCode}
+                                                                        </span>
+                                                                        <span className="text-gray-600 dark:text-gray-300 tabular-nums">
+                                                                            {cu.amountUsed.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="mt-1 flex flex-wrap gap-1">
+                                                                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                                                            cu.invoiceId
+                                                                                ? 'bg-green-100 text-green-700 dark:bg-green-900/60 dark:text-green-300'
+                                                                                : 'bg-gray-100 text-gray-600 dark:bg-gray-600 dark:text-gray-300'
+                                                                        }`}>
+                                                                            {cu.invoiceId ? `Inv. ${cu.invoiceId}` : 'Bill pending'}
+                                                                        </span>
+                                                                        {(cu.isBilled || cu.invoiceId) && (
+                                                                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                                                                cu.paymentDate
+                                                                                    ? 'bg-green-100 text-green-700 dark:bg-green-900/60 dark:text-green-300'
+                                                                                    : 'bg-gray-100 text-gray-600 dark:bg-gray-600 dark:text-gray-300'
+                                                                            }`}>
+                                                                                {cu.paymentDate
+                                                                                    ? `Paid ${cu.paymentDate.split('T')[0]}`
+                                                                                    : 'Pay pending'}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
                                     </td>
                                     <td className="px-6 py-4 text-right text-sm font-medium break-words w-1/12">
                                         <button

@@ -111,3 +111,6 @@ google-sheets-credentials.json
 
 .cursor
 
+# Database backups (keep folder, ignore dump files)
+backend/auth-service/db-backup/*.sql
+backend/company-service/db-backup/*.sql

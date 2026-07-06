@@ -49,4 +49,9 @@ jwt:
 
 auth-service:
   url: http://localhost:8082
-  validate-token-path: /api/auth/validate 
+  validate-token-path: /api/auth/validate
+
+db-backup:
+  directory: db-backup
+  use-docker: true
+  docker-container: company-service-db

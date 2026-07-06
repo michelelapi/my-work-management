@@ -79,6 +79,7 @@ const Header: React.FC = () => {
     }
     if (pathname === '/notes') return 'Notes';
     if (pathname === '/reminders') return 'Reminders';
+    if (pathname === '/db-backups') return 'DB Backups';
     if (pathname === '/ai-agent') return 'AI Agent';
     return 'Previous Page';
   };
@@ -145,6 +146,10 @@ const Header: React.FC = () => {
     if (path === '/reminders') {
       return currentPath === '/reminders';
     }
+
+    if (path === '/db-backups') {
+      return currentPath === '/db-backups';
+    }
     
     return currentPath === path;
   };
@@ -207,6 +212,9 @@ const Header: React.FC = () => {
                   </li>
                   <li>
                     <Link to="/reminders" className={getLinkClasses('/reminders')}>Reminders</Link>
+                  </li>
+                  <li>
+                    <Link to="/db-backups" className={getLinkClasses('/db-backups')}>DB Backups</Link>
                   </li>
                   <li>
                     <Link to="/companies" className={getLinkClasses('/companies')}>Company</Link>

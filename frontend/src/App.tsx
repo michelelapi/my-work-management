@@ -21,6 +21,7 @@ import NotesPage from './pages/NotesPage';
 import RemindersPage from './pages/RemindersPage';
 import ContractListPage from './pages/ContractListPage';
 import ContractFormPage from './pages/ContractFormPage';
+import DbBackupPage from './pages/DbBackupPage';
 
 function App() {
   return (
@@ -68,6 +69,7 @@ function App() {
                 <Route path="/ai-agent" element={<ProtectedRoute><AiAgentPage /></ProtectedRoute>} />
                 <Route path="/notes" element={<ProtectedRoute><NotesPage /></ProtectedRoute>} />
                 <Route path="/reminders" element={<ProtectedRoute><RemindersPage /></ProtectedRoute>} />
+                <Route path="/db-backups" element={<ProtectedRoute><DbBackupPage /></ProtectedRoute>} />
 
                 <Route path="*" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               </Routes>

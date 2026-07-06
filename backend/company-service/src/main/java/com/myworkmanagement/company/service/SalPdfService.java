@@ -20,8 +20,6 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
@@ -57,6 +55,13 @@ public class SalPdfService {
         }
         // Replace newlines and other control characters with spaces
         return text.replaceAll("[\\r\\n\\t]", " ").replaceAll("\\p{Cntrl}", "");
+    }
+
+    private String resolveClientName(TaskDTO task) {
+        if (task.getClientName() != null && !task.getClientName().trim().isEmpty()) {
+            return task.getClientName();
+        }
+        return "No Client";
     }
 
     /**
@@ -359,57 +364,54 @@ public class SalPdfService {
         contentStream.showText("Importo+IVA");
         contentStream.endText();
 
-        // Group tasks by client
-        Map<String, List<TaskDTO>> tasksByClient = tasks.stream()
-                .collect(Collectors.groupingBy(
-                    task -> task.getClientName() != null && !task.getClientName().trim().isEmpty() 
-                        ? task.getClientName() 
-                        : "No Client"
-                ));
-
-        // Table rows - iterate through client groups
+        // Table rows - preserve task list order; client headers/subtotals only on contiguous blocks
         BigDecimal totalHours = BigDecimal.ZERO;
         BigDecimal totalAmount = BigDecimal.ZERO;
         BigDecimal totalAmountWithVat = BigDecimal.ZERO;
 
-        // Iterate through each client group
-        for (Map.Entry<String, List<TaskDTO>> clientGroup : tasksByClient.entrySet()) {
-            String clientName = clientGroup.getKey();
-            List<TaskDTO> clientTasks = clientGroup.getValue();
-            
-            // Draw client header (if not "No Client" or if it's the first group)
-            if (!"No Client".equals(clientName)) {
-                // Check if we need a new page before client header
-                if (yPosition < 200) {
-                    contentStream.close();
-                    PDPage newPage = new PDPage();
-                    document.addPage(newPage);
-                    contentStream = new PDPageContentStream(document, newPage);
-                    yPosition = pageHeight - margin - 40;
-                }
-                
-                yPosition -= 25;
-                contentStream.beginText();
-                contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 11);
-                contentStream.newLineAtOffset(margin, yPosition);
-                contentStream.showText("Cliente: " + sanitizeTextForPdf(clientName));
-                contentStream.endText();
-                yPosition -= 15;
-                
-                // Draw a line under client header
-                contentStream.setLineWidth(0.5f);
-                contentStream.moveTo(margin, yPosition);
-                contentStream.lineTo(pageWidth - margin, yPosition);
-                contentStream.stroke();
-                yPosition -= 10;
-            }
-            
-            // Client subtotals
-            BigDecimal clientHours = BigDecimal.ZERO;
-            BigDecimal clientAmount = BigDecimal.ZERO;
-            BigDecimal clientAmountWithVat = BigDecimal.ZERO;
+        long distinctClientCount = tasks.stream().map(this::resolveClientName).distinct().count();
+        boolean multipleClients = distinctClientCount > 1;
 
-            for (TaskDTO task : clientTasks) {
+        String activeClient = null;
+        BigDecimal clientHours = BigDecimal.ZERO;
+        BigDecimal clientAmount = BigDecimal.ZERO;
+        BigDecimal clientAmountWithVat = BigDecimal.ZERO;
+
+        for (int i = 0; i < tasks.size(); i++) {
+            TaskDTO task = tasks.get(i);
+            String clientName = resolveClientName(task);
+            String nextClient = (i + 1 < tasks.size()) ? resolveClientName(tasks.get(i + 1)) : null;
+
+            if (!clientName.equals(activeClient)) {
+                if (!"No Client".equals(clientName)) {
+                    if (yPosition < 200) {
+                        contentStream.close();
+                        PDPage newPage = new PDPage();
+                        document.addPage(newPage);
+                        contentStream = new PDPageContentStream(document, newPage);
+                        yPosition = pageHeight - margin - 40;
+                    }
+
+                    yPosition -= 25;
+                    contentStream.beginText();
+                    contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 11);
+                    contentStream.newLineAtOffset(margin, yPosition);
+                    contentStream.showText("Cliente: " + sanitizeTextForPdf(clientName));
+                    contentStream.endText();
+                    yPosition -= 15;
+
+                    contentStream.setLineWidth(0.5f);
+                    contentStream.moveTo(margin, yPosition);
+                    contentStream.lineTo(pageWidth - margin, yPosition);
+                    contentStream.stroke();
+                    yPosition -= 10;
+                }
+                activeClient = clientName;
+                clientHours = BigDecimal.ZERO;
+                clientAmount = BigDecimal.ZERO;
+                clientAmountWithVat = BigDecimal.ZERO;
+            }
+
                 // Prepare description to calculate row height (using title field)
                 String description = task.getTitle() != null ? task.getTitle() : task.getDescription();
                 description = sanitizeTextForPdf(description);
@@ -536,11 +538,9 @@ public class SalPdfService {
                 totalHours = totalHours.add(hours);
                 totalAmount = totalAmount.add(amount);
                 totalAmountWithVat = totalAmountWithVat.add(amountWithVat);
-            }
-            
-            // Display client subtotals (if more than one client group or if client name is not "No Client")
-            if (tasksByClient.size() > 1 || !"No Client".equals(clientName)) {
-                // Check if we need a new page before subtotals
+
+            boolean endOfClientBlock = nextClient == null || !clientName.equals(nextClient);
+            if (endOfClientBlock && (multipleClients || !"No Client".equals(clientName))) {
                 if (yPosition < 100) {
                     contentStream.close();
                     PDPage newPage = new PDPage();

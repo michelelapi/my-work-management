@@ -205,8 +205,10 @@ const TaskFilters: React.FC<TaskFiltersProps> = ({
                     >
                         <option value="all">All Status</option>
                         <option value="billed">Billed</option>
+                        <option value="partially_billed">Partially Billed</option>
                         <option value="unbilled">Unbilled</option>
                         <option value="paid">Paid</option>
+                        <option value="partially_paid">Partially Paid</option>
                         <option value="unpaid">Unpaid</option>
                     </select>
 

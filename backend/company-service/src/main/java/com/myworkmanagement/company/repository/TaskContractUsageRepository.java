@@ -12,6 +12,8 @@ public interface TaskContractUsageRepository extends JpaRepository<TaskContractU
 
     List<TaskContractUsage> findByTaskId(Long taskId);
 
+    List<TaskContractUsage> findByTaskIdOrderByIdAsc(Long taskId);
+
     List<TaskContractUsage> findByContractId(Long contractId);
 
     @Modifying

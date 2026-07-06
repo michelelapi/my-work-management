@@ -57,8 +57,14 @@ public class Task {
     @Column(name = "is_billed")
     private Boolean isBilled;
 
+    @Column(name = "is_partially_billed")
+    private Boolean isPartiallyBilled;
+
     @Column(name = "is_paid")
     private Boolean isPaid;
+
+    @Column(name = "is_partially_paid")
+    private Boolean isPartiallyPaid;
 
     @Column(name = "billing_date")
     private LocalDate billingDate;

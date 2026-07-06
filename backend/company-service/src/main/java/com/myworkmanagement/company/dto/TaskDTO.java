@@ -58,8 +58,14 @@ public class TaskDTO {
     @Schema(description = "Indicates if the task has been billed", example = "false")
     private Boolean isBilled;
 
+    @Schema(description = "Indicates if the task is partially billed across contracts", example = "false")
+    private Boolean isPartiallyBilled;
+
     @Schema(description = "Indicates if the task has been paid", example = "false")
     private Boolean isPaid;
+
+    @Schema(description = "Indicates if the task is partially paid across contracts", example = "false")
+    private Boolean isPartiallyPaid;
 
     @Schema(description = "Date when the task was billed", example = "2024-03-25")
     private LocalDate billingDate;

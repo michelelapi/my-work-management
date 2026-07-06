@@ -14,7 +14,9 @@ export interface Task {
     type?: string;
     currency?: string;
     isBilled?: boolean;
+    isPartiallyBilled?: boolean;
     isPaid?: boolean;
+    isPartiallyPaid?: boolean;
     billingDate?: string;
     paymentDate?: string;
     invoiceId?: string;

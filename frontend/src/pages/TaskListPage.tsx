@@ -18,6 +18,11 @@ import TaskActionButtons from '../components/TaskActionButtons';
 import BillingStatusModal from '../components/BillingStatusModal';
 import PaymentStatusModal from '../components/PaymentStatusModal';
 import InfoForBillModal from '../components/InfoForBillModal';
+import GenerateSalModal from '../components/GenerateSalModal';
+import PartialBillingModal from '../components/PartialBillingModal';
+import PartialPaymentModal from '../components/PartialPaymentModal';
+import { getBillingStatus } from '../utils/billingStatus';
+import { getPaymentStatus } from '../utils/paymentStatus';
 
 // Helper function to format numbers with thousands separators
 const formatNumber = (value: number, decimals: number = 2): string => {
@@ -52,14 +57,25 @@ const TaskListPage: React.FC = () => {
 
     // Billing status states
     const [billingStatusModalOpen, setBillingStatusModalOpen] = useState(false);
+    const [billingModalTasks, setBillingModalTasks] = useState<Task[]>([]);
+    const [billingUpdating, setBillingUpdating] = useState(false);
+    const [partialBillingModalOpen, setPartialBillingModalOpen] = useState(false);
+    const [taskForPartialBilling, setTaskForPartialBilling] = useState<Task | null>(null);
+    const [partialBillingUpdating, setPartialBillingUpdating] = useState(false);
     const [selectedBillingStatus, setSelectedBillingStatus] = useState<boolean | null>(null);
     const [billingDate, setBillingDate] = useState<string>(new Date().toISOString().split('T')[0]);
     const [invoiceId, setInvoiceId] = useState<string>('');
 
     // Payment status states
     const [paymentStatusModalOpen, setPaymentStatusModalOpen] = useState(false);
+    const [paymentModalTasks, setPaymentModalTasks] = useState<Task[]>([]);
+    const [paymentUpdating, setPaymentUpdating] = useState(false);
+    const [partialPaymentModalOpen, setPartialPaymentModalOpen] = useState(false);
+    const [taskForPartialPayment, setTaskForPartialPayment] = useState<Task | null>(null);
+    const [partialPaymentUpdating, setPartialPaymentUpdating] = useState(false);
     const [selectedPaymentStatus, setSelectedPaymentStatus] = useState<boolean | null>(null);
     const [paymentDate, setPaymentDate] = useState<string>(new Date().toISOString().split('T')[0]);
+    const [paymentDates, setPaymentDates] = useState<string>('');
 
     // Invoice ID modal state for single task billing
     const [invoiceIdModalOpen, setInvoiceIdModalOpen] = useState(false);
@@ -69,6 +85,12 @@ const TaskListPage: React.FC = () => {
     // Info For Bill modal state
     const [infoForBillModalOpen, setInfoForBillModalOpen] = useState(false);
     const [copiedField, setCopiedField] = useState<string | null>(null);
+
+    // Generate SAL modal state
+    const [salModalOpen, setSalModalOpen] = useState(false);
+    const [salModalTasks, setSalModalTasks] = useState<Task[]>([]);
+    const [salModalPeriod, setSalModalPeriod] = useState<{ year: number; month: number } | null>(null);
+    const [salGenerating, setSalGenerating] = useState(false);
 
     // Type filter state
     const [typeFilter, setTypeFilter] = useState<string | null>(null);
@@ -245,9 +267,13 @@ const TaskListPage: React.FC = () => {
                     isBilled = true;
                 } else if (statusFilter === 'unbilled') {
                     isBilled = false;
+                } else if (statusFilter === 'partially_billed') {
+                    isBilled = false;
                 } else if (statusFilter === 'paid') {
                     isPaid = true;
                 } else if (statusFilter === 'unpaid') {
+                    isPaid = false;
+                } else if (statusFilter === 'partially_paid') {
                     isPaid = false;
                 }
                 
@@ -261,10 +287,11 @@ const TaskListPage: React.FC = () => {
                 const urlMonth = searchParams.get('month');
                 const urlYear = searchParams.get('year');
                 const hasDateFilter = monthFilter || yearFilter || urlMonth || urlYear;
+                const needsFullFetch = hasDateFilter || statusFilter === 'partially_billed' || statusFilter === 'partially_paid';
                 
                 // If date filters are active, fetch ALL pages to ensure we get all matching tasks
                 // Otherwise use normal pagination
-                if (hasDateFilter) {
+                if (needsFullFetch) {
                     console.log('Date filter active - fetching all pages...', 'monthFilter:', monthFilter, 'yearFilter:', yearFilter, 'urlMonth:', urlMonth, 'urlYear:', urlYear);
                     // Fetch all pages
                     let page = 0;
@@ -402,9 +429,19 @@ const TaskListPage: React.FC = () => {
                     });
                     console.log('After year filtering - tasks count:', filteredTasks.length);
                 }
+
+                if (statusFilter === 'unbilled') {
+                    filteredTasks = filteredTasks.filter(task => !task.isBilled && !task.isPartiallyBilled);
+                } else if (statusFilter === 'partially_billed') {
+                    filteredTasks = filteredTasks.filter(task => task.isPartiallyBilled);
+                } else if (statusFilter === 'unpaid') {
+                    filteredTasks = filteredTasks.filter(task => !task.isPaid && !task.isPartiallyPaid);
+                } else if (statusFilter === 'partially_paid') {
+                    filteredTasks = filteredTasks.filter(task => task.isPartiallyPaid);
+                }
                 
                 // Apply pagination to filtered results if date filters are active
-                if (activeMonthFilter || activeYearFilter) {
+                if (activeMonthFilter || activeYearFilter || statusFilter === 'partially_billed' || statusFilter === 'partially_paid') {
                     // Store all filtered tasks for summary calculation (all pages)
                     setAllFilteredTasks(filteredTasks);
                     const startIndex = currentPage * pageSize;
@@ -542,16 +579,21 @@ const TaskListPage: React.FC = () => {
     };
 
     const handleCloseBillingStatusModal = () => {
+        if (billingUpdating) return;
         setBillingStatusModalOpen(false);
+        setBillingModalTasks([]);
         setSelectedBillingStatus(null);
         setBillingDate(new Date().toISOString().split('T')[0]);
         setInvoiceId('');
     };
 
     const handleClosePaymentStatusModal = () => {
+        if (paymentUpdating) return;
         setPaymentStatusModalOpen(false);
+        setPaymentModalTasks([]);
         setSelectedPaymentStatus(null);
         setPaymentDate(new Date().toISOString().split('T')[0]);
+        setPaymentDates('');
     };
 
     const refreshCurrentTaskPage = async () => {
@@ -590,12 +632,13 @@ const TaskListPage: React.FC = () => {
         setTotalElements(response.totalElements);
     };
 
-    const handleBillingStatusUpdate = async () => {
+    const handleBillingStatusUpdate = async (orderedTasks: Task[]) => {
         if (selectedBillingStatus === null) return;
-        if (!hasSelectedTasks) return;
+        if (orderedTasks.length === 0) return;
 
         try {
-            const taskUpdates = selectedTasks.map(task => ({
+            setBillingUpdating(true);
+            const taskUpdates = orderedTasks.map(task => ({
                 taskId: task.id!,
                 isBilled: selectedBillingStatus,
                 billingDate: billingDate,
@@ -604,52 +647,83 @@ const TaskListPage: React.FC = () => {
 
             await taskService.updateTasksBillingStatus(taskUpdates);
             
-            // Refresh list with the same page/filter/sort to keep order stable.
             await refreshCurrentTaskPage();
             
             setBillingStatusModalOpen(false);
+            setBillingModalTasks([]);
             setSelectedBillingStatus(null);
             setBillingDate(new Date().toISOString().split('T')[0]);
             setInvoiceId('');
         } catch (err) {
             setError('Failed to update billing status. Please try again later.');
             console.error('Error updating billing status:', err);
+        } finally {
+            setBillingUpdating(false);
         }
     };
 
     const handlePaymentStatusUpdate = async () => {
         if (selectedPaymentStatus === null) return;
-        if (!hasSelectedTasks) return;
+        if (paymentModalTasks.length === 0) return;
 
         try {
-            const taskUpdates = selectedTasks.map(task => ({
+            setPaymentUpdating(true);
+            const taskUpdates = paymentModalTasks.map(task => ({
                 taskId: task.id!,
                 isPaid: selectedPaymentStatus,
-                paymentDate: paymentDate
+                paymentDate: paymentDate,
+                ...(paymentDates.trim() ? { paymentDates: paymentDates.trim() } : {})
             }));
 
             await taskService.updateTasksPaymentStatus(taskUpdates);
-            
-            // Refresh list with the same page/filter/sort to keep order stable.
             await refreshCurrentTaskPage();
-            
             setPaymentStatusModalOpen(false);
+            setPaymentModalTasks([]);
             setSelectedPaymentStatus(null);
             setPaymentDate(new Date().toISOString().split('T')[0]);
+            setPaymentDates('');
         } catch (err) {
             setError('Failed to update payment status. Please try again later.');
             console.error('Error updating payment status:', err);
+        } finally {
+            setPaymentUpdating(false);
+        }
+    };
+
+    const handleClosePartialPaymentModal = () => {
+        if (partialPaymentUpdating) return;
+        setPartialPaymentModalOpen(false);
+        setTaskForPartialPayment(null);
+    };
+
+    const handlePartialPaymentUpdate = async (taskId: number, paymentDateValue: string) => {
+        try {
+            setPartialPaymentUpdating(true);
+            await taskService.payNextPartialPortion(taskId, paymentDateValue);
+            await refreshCurrentTaskPage();
+            setPartialPaymentModalOpen(false);
+            setTaskForPartialPayment(null);
+        } catch (err) {
+            setError('Failed to pay the remaining portion. Please try again later.');
+            console.error('Error paying partial portion:', err);
+        } finally {
+            setPartialPaymentUpdating(false);
         }
     };
 
     const handleToggleBillingStatus = async (task: Task) => {
         if (!task.id) return;
 
-        const newBillingStatus = !task.isBilled;
+        const billingStatus = getBillingStatus(task);
 
-        // If unbilling, proceed directly without modal
-        if (!newBillingStatus) {
+        if (billingStatus === 'billed') {
             await performBillingStatusUpdate(task, false, '', new Date().toISOString().split('T')[0]);
+            return;
+        }
+
+        if (billingStatus === 'partially_billed') {
+            setTaskForPartialBilling(task);
+            setPartialBillingModalOpen(true);
             return;
         }
 
@@ -675,6 +749,27 @@ const TaskListPage: React.FC = () => {
             setTaskToBill(task);
             setInvoiceIdInput(task.invoiceId || '');
             setInvoiceIdModalOpen(true);
+        }
+    };
+
+    const handleClosePartialBillingModal = () => {
+        if (partialBillingUpdating) return;
+        setPartialBillingModalOpen(false);
+        setTaskForPartialBilling(null);
+    };
+
+    const handlePartialBillingUpdate = async (taskId: number, invoiceId: string, billingDate: string) => {
+        try {
+            setPartialBillingUpdating(true);
+            await taskService.billNextPartialPortion(taskId, invoiceId, billingDate);
+            await refreshCurrentTaskPage();
+            setPartialBillingModalOpen(false);
+            setTaskForPartialBilling(null);
+        } catch (err) {
+            setError('Failed to bill the remaining portion. Please try again later.');
+            console.error('Error billing partial portion:', err);
+        } finally {
+            setPartialBillingUpdating(false);
         }
     };
 
@@ -764,54 +859,42 @@ const TaskListPage: React.FC = () => {
     const handleTogglePaymentStatus = async (task: Task) => {
         if (!task.id) return;
 
-        try {
-            const newPaymentStatus = !task.isPaid;
-            // Always send a valid date - backend will ignore it if isPaid is false
-            const paymentDateToSend = newPaymentStatus 
-                ? new Date().toISOString().split('T')[0] 
-                : (task.paymentDate || new Date().toISOString().split('T')[0]);
-            const taskUpdate = [{
-                taskId: task.id,
-                isPaid: newPaymentStatus,
-                paymentDate: paymentDateToSend
-            }];
+        const paymentStatus = getPaymentStatus(task);
 
-            await taskService.updateTasksPaymentStatus(taskUpdate);
-            
-            // Refresh the task list
-            const effectiveProjectId: number | undefined = projectId 
-                ? parseInt(projectId) 
-                : (projectFilter !== null && projectFilter !== undefined) 
-                    ? projectFilter 
-                    : undefined;
-            
-            let isBilled: boolean | undefined = undefined;
-            let isPaid: boolean | undefined = undefined;
-            if (statusFilter === 'billed') {
-                isBilled = true;
-            } else if (statusFilter === 'unbilled') {
-                isBilled = false;
-            } else if (statusFilter === 'paid') {
-                isPaid = true;
-            } else if (statusFilter === 'unpaid') {
-                isPaid = false;
+        if (paymentStatus === 'paid') {
+            try {
+                await taskService.updateTasksPaymentStatus([{
+                    taskId: task.id,
+                    isPaid: false,
+                    paymentDate: task.paymentDate || new Date().toISOString().split('T')[0]
+                }]);
+                await refreshCurrentTaskPage();
+            } catch (err) {
+                setError('Failed to update payment status. Please try again later.');
+                console.error('Error updating payment status:', err);
             }
-            
-            const sortParam = `${sortField},${sortDirection}`;
-            
-            const response = await taskService.getTasks(
-                effectiveProjectId,
-                currentPage,
-                pageSize,
-                debouncedSearchTerm,
-                isBilled,
-                isPaid,
-                sortParam,
-                typeFilter || undefined
-            );
-            setTasks(response.content);
-            setTotalPages(response.totalPages);
-            setTotalElements(response.totalElements);
+            return;
+        }
+
+        if (paymentStatus === 'partially_paid') {
+            try {
+                const freshTask = await taskService.getTask(task.id);
+                setTaskForPartialPayment(freshTask);
+                setPartialPaymentModalOpen(true);
+            } catch (err) {
+                setError('Failed to load task details. Please try again later.');
+                console.error('Error loading task for partial payment:', err);
+            }
+            return;
+        }
+
+        try {
+            await taskService.updateTasksPaymentStatus([{
+                taskId: task.id,
+                isPaid: true,
+                paymentDate: new Date().toISOString().split('T')[0]
+            }]);
+            await refreshCurrentTaskPage();
         } catch (err) {
             setError('Failed to update payment status. Please try again later.');
             console.error('Error updating payment status:', err);
@@ -864,72 +947,98 @@ const TaskListPage: React.FC = () => {
         navigate('/tasks/new');
     };
 
-    // Handle SAL PDF generation - uses filtered tasks
+    const resolveSalPeriod = (): { year: number; month: number } | null => {
+        if (monthFilter) {
+            const [filterYear, filterMonth] = monthFilter.split('-');
+            const year = parseInt(filterYear, 10);
+            const month = parseInt(filterMonth, 10);
+            if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
+                setError('Invalid date filter. Please use a valid month filter (YYYY-MM) or set a year filter.');
+                return null;
+            }
+            return { year, month };
+        }
+        if (yearFilter) {
+            const year = parseInt(yearFilter, 10);
+            if (isNaN(year)) {
+                setError('Invalid year filter. Please use a valid year.');
+                return null;
+            }
+            return { year, month: new Date().getMonth() + 1 };
+        }
+        const tasksWithDates = (allFilteredTasks.length > 0 ? allFilteredTasks : tasks)
+            .filter(t => t.startDate)
+            .map(t => {
+                const date = new Date(t.startDate);
+                return { year: date.getFullYear(), month: date.getMonth() + 1 };
+            });
+        if (tasksWithDates.length > 0) {
+            return tasksWithDates[0];
+        }
+        const now = new Date();
+        return { year: now.getFullYear(), month: now.getMonth() + 1 };
+    };
+
+    const resolveActionCandidateTasks = (): Task[] => {
+        if (selectedTaskIds.size > 0) {
+            const source = allFilteredTasks.length > 0 ? allFilteredTasks : tasks;
+            return source.filter(t => t.id !== undefined && selectedTaskIds.has(t.id));
+        }
+        if (allFilteredTasks.length > 0) {
+            return [...allFilteredTasks];
+        }
+        return [...tasks];
+    };
+
+    const downloadSalBlob = (blob: Blob, filename: string) => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+    };
+
     const handleGenerateSal = async () => {
         try {
-            // Check if there are any tasks to generate SAL for
             if (allFilteredTasks.length === 0 && tasks.length === 0) {
                 setError('No tasks available to generate SAL PDF. Please filter tasks first.');
                 return;
             }
 
-            // Determine year and month from filters or current date
-            let year: number;
-            let month: number;
-            
-            if (monthFilter) {
-                // Extract year and month from monthFilter (format: YYYY-MM)
-                const [filterYear, filterMonth] = monthFilter.split('-');
-                year = parseInt(filterYear, 10);
-                month = parseInt(filterMonth, 10);
-                
-                if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
-                    setError('Invalid date filter. Please use a valid month filter (YYYY-MM) or set a year filter.');
-                    return;
-                }
-            } else if (yearFilter) {
-                // Use year filter and current month
-                year = parseInt(yearFilter, 10);
-                month = new Date().getMonth() + 1;
-                
-                if (isNaN(year)) {
-                    setError('Invalid year filter. Please use a valid year.');
-                    return;
-                }
-            } else {
-                // Try to extract year/month from the filtered tasks
-                const tasksWithDates = (allFilteredTasks.length > 0 ? allFilteredTasks : tasks)
-                    .filter(t => t.startDate)
-                    .map(t => {
-                        const date = new Date(t.startDate);
-                        return { year: date.getFullYear(), month: date.getMonth() + 1 };
-                    });
-                
-                if (tasksWithDates.length > 0) {
-                    // Use the most common year/month from tasks, or the first task's date
-                    const firstTask = tasksWithDates[0];
-                    year = firstTask.year;
-                    month = firstTask.month;
-                } else {
-                    // Fallback to current date
-                    const now = new Date();
-                    year = now.getFullYear();
-                    month = now.getMonth() + 1;
-                }
+            const period = resolveSalPeriod();
+            if (!period) return;
+
+            const candidateTasks = resolveActionCandidateTasks();
+            if (candidateTasks.length === 0) {
+                setError('No tasks available to generate SAL PDF. Please filter tasks first.');
+                return;
             }
-            
+
             const shouldProceed = await runReminderPreflightGate('GET', '/tasks/sal/pdf');
             if (!shouldProceed) {
                 return;
             }
 
-            const selectedIds = selectedTaskIds.size > 0
-                ? Array.from(selectedTaskIds)
-                : undefined;
+            setSalModalTasks(candidateTasks);
+            setSalModalPeriod(period);
+            setSalModalOpen(true);
+        } catch (err: any) {
+            console.error('Error opening SAL modal:', err);
+            setError('Failed to prepare SAL generation. Please try again.');
+        }
+    };
 
+    const handleSalModalGenerate = async (orderedTaskIds: number[]) => {
+        if (!salModalPeriod) return;
+
+        try {
+            setSalGenerating(true);
             const result = await taskService.generateSalPdf(
-                year,
-                month,
+                salModalPeriod.year,
+                salModalPeriod.month,
                 projectFilter || (projectId ? parseInt(projectId) : undefined),
                 undefined,
                 undefined,
@@ -937,20 +1046,12 @@ const TaskListPage: React.FC = () => {
                 undefined,
                 undefined,
                 true,
-                selectedIds
+                orderedTaskIds
             );
-            const url = window.URL.createObjectURL(result.blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = result.filename;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
+            downloadSalBlob(result.blob, result.filename);
+            setSalModalOpen(false);
         } catch (err: any) {
             console.error('Error generating SAL PDF:', err);
-            
-            // Provide more specific error messages
             if (err.response) {
                 if (err.response.status === 400) {
                     setError('No tasks found for the selected period. Please check your filters and ensure there are tasks for the selected year/month.');
@@ -964,6 +1065,8 @@ const TaskListPage: React.FC = () => {
             } else {
                 setError('Failed to generate SAL PDF. Please check your connection and try again.');
             }
+        } finally {
+            setSalGenerating(false);
         }
     };
 
@@ -1117,25 +1220,29 @@ const TaskListPage: React.FC = () => {
                     {/* Action Buttons Group - Left Side */}
                     <TaskActionButtons
                         onBillingStatusClick={async () => {
-                            if (!hasSelectedTasks) {
-                                window.alert('Select at least one task first.');
+                            const candidateTasks = resolveActionCandidateTasks();
+                            if (candidateTasks.length === 0) {
+                                window.alert('No tasks available. Please filter tasks or select at least one task first.');
                                 return;
                             }
                             const shouldProceed = await runReminderPreflightGate('PUT', '/tasks/billing-status');
                             if (!shouldProceed) {
                                 return;
                             }
+                            setBillingModalTasks(candidateTasks);
                             setBillingStatusModalOpen(true);
                         }}
                         onPaymentStatusClick={async () => {
-                            if (!hasSelectedTasks) {
-                                window.alert('Select at least one task first.');
+                            const candidateTasks = resolveActionCandidateTasks();
+                            if (candidateTasks.length === 0) {
+                                window.alert('No tasks available. Please filter tasks or select at least one task first.');
                                 return;
                             }
                             const shouldProceed = await runReminderPreflightGate('PUT', '/tasks/payment-status');
                             if (!shouldProceed) {
                                 return;
                             }
+                            setPaymentModalTasks(candidateTasks);
                             setPaymentStatusModalOpen(true);
                         }}
                         onInfoForBillClick={async () => {
@@ -1178,27 +1285,47 @@ const TaskListPage: React.FC = () => {
             {/* Billing Status Update Modal */}
             <BillingStatusModal
                 isOpen={billingStatusModalOpen}
-                taskCount={selectedTasks.length}
+                tasks={billingModalTasks}
                 selectedBillingStatus={selectedBillingStatus}
                 onBillingStatusChange={setSelectedBillingStatus}
                 billingDate={billingDate}
                 onBillingDateChange={setBillingDate}
                 invoiceId={invoiceId}
                 onInvoiceIdChange={setInvoiceId}
+                updating={billingUpdating}
                 onClose={handleCloseBillingStatusModal}
                 onUpdate={handleBillingStatusUpdate}
+            />
+
+            <PartialBillingModal
+                isOpen={partialBillingModalOpen}
+                task={taskForPartialBilling}
+                updating={partialBillingUpdating}
+                onClose={handleClosePartialBillingModal}
+                onUpdate={handlePartialBillingUpdate}
             />
 
             {/* Payment Status Update Modal */}
             <PaymentStatusModal
                 isOpen={paymentStatusModalOpen}
-                taskCount={selectedTasks.length}
+                taskCount={paymentModalTasks.length}
                 selectedPaymentStatus={selectedPaymentStatus}
                 onPaymentStatusChange={setSelectedPaymentStatus}
                 paymentDate={paymentDate}
                 onPaymentDateChange={setPaymentDate}
+                paymentDates={paymentDates}
+                onPaymentDatesChange={setPaymentDates}
+                updating={paymentUpdating}
                 onClose={handleClosePaymentStatusModal}
                 onUpdate={handlePaymentStatusUpdate}
+            />
+
+            <PartialPaymentModal
+                isOpen={partialPaymentModalOpen}
+                task={taskForPartialPayment}
+                updating={partialPaymentUpdating}
+                onClose={handleClosePartialPaymentModal}
+                onUpdate={handlePartialPaymentUpdate}
             />
 
             {/* Info For Bill Modal */}
@@ -1211,6 +1338,17 @@ const TaskListPage: React.FC = () => {
                 copiedField={copiedField}
                 onCopy={handleCopy}
                 onClose={() => setInfoForBillModalOpen(false)}
+            />
+
+            {/* Generate SAL Modal */}
+            <GenerateSalModal
+                isOpen={salModalOpen}
+                tasks={salModalTasks}
+                year={salModalPeriod?.year ?? new Date().getFullYear()}
+                month={salModalPeriod?.month ?? new Date().getMonth() + 1}
+                generating={salGenerating}
+                onClose={() => !salGenerating && setSalModalOpen(false)}
+                onGenerate={handleSalModalGenerate}
             />
 
             {/* Filter Section */}
@@ -1336,27 +1474,53 @@ const TaskListPage: React.FC = () => {
                                             <span 
                                                 onClick={() => handleToggleBillingStatus(task)}
                                                 className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity ${
-                                                    task.isBilled ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                                                    getBillingStatus(task) === 'billed'
+                                                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                                        : getBillingStatus(task) === 'partially_billed'
+                                                        ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
+                                                        : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
                                                 }`}
-                                                title="Click to toggle billing status"
+                                                title={
+                                                    getBillingStatus(task) === 'partially_billed'
+                                                        ? 'Click to bill the remaining portion'
+                                                        : 'Click to toggle billing status'
+                                                }
                                             >
-                                                {task.isBilled ? 'Billed' : 'Unbilled'}
+                                                {getBillingStatus(task) === 'billed'
+                                                    ? 'Billed'
+                                                    : getBillingStatus(task) === 'partially_billed'
+                                                    ? 'Partially Billed'
+                                                    : 'Unbilled'}
                                             </span>
                                             <span 
                                                 onClick={() => handleTogglePaymentStatus(task)}
                                                 className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity ${
-                                                    task.isPaid ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                                                    getPaymentStatus(task) === 'paid'
+                                                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                                        : getPaymentStatus(task) === 'partially_paid'
+                                                        ? 'bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-200'
+                                                        : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
                                                 }`}
-                                                title="Click to toggle payment status"
+                                                title={
+                                                    getPaymentStatus(task) === 'partially_paid'
+                                                        ? 'Click to pay the remaining portion'
+                                                        : 'Click to toggle payment status'
+                                                }
                                             >
-                                                {task.isPaid ? 'Paid' : 'Unpaid'}
+                                                {getPaymentStatus(task) === 'paid'
+                                                    ? 'Paid'
+                                                    : getPaymentStatus(task) === 'partially_paid'
+                                                    ? 'Partially Paid'
+                                                    : 'Unpaid'}
                                             </span>
                                         </div>
-                                        {task.isBilled && task.contractUsages && task.contractUsages.length > 0 && (
+                                        {(task.isBilled || task.isPartiallyBilled || task.isPaid || task.isPartiallyPaid) && task.contractUsages && task.contractUsages.length > 0 && (
                                             <div className="mt-1 space-y-0.5">
                                                 {task.contractUsages.map((cu, idx) => (
                                                     <div key={idx} className="text-xs text-gray-500 dark:text-gray-400">
                                                         <span className="font-mono">{cu.contractCode}</span>: {cu.amountUsed.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                        {cu.invoiceId ? ` · bill ${cu.invoiceId}` : ' · bill pending'}
+                                                        {cu.paymentDate ? ` · paid ${cu.paymentDate.split('T')[0]}` : (cu.isBilled || cu.invoiceId ? ' · pay pending' : '')}
                                                     </div>
                                                 ))}
                                             </div>

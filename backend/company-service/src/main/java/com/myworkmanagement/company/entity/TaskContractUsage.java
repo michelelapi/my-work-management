@@ -8,6 +8,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 @Data
 @Entity
@@ -37,4 +38,13 @@ public class TaskContractUsage {
 
     @Column(name = "contract_code", nullable = false, length = 100)
     private String contractCode;
+
+    @Column(name = "invoice_id")
+    private String invoiceId;
+
+    @Column(name = "billing_date")
+    private LocalDate billingDate;
+
+    @Column(name = "payment_date")
+    private LocalDate paymentDate;
 }

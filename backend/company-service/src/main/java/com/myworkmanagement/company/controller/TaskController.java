@@ -3,6 +3,8 @@ package com.myworkmanagement.company.controller;
 import com.myworkmanagement.company.dto.TaskContractUsageDTO;
 import com.myworkmanagement.company.dto.TaskDTO;
 import com.myworkmanagement.company.dto.TaskBillingStatusUpdateDTO;
+import com.myworkmanagement.company.dto.TaskPartialBillingUpdateDTO;
+import com.myworkmanagement.company.dto.TaskPartialPaymentUpdateDTO;
 import com.myworkmanagement.company.dto.TaskPaymentStatusUpdateDTO;
 import com.myworkmanagement.company.entity.Company;
 import com.myworkmanagement.company.entity.Project;
@@ -364,6 +366,21 @@ public class TaskController {
         return ResponseEntity.ok(taskService.updateTasksBillingStatus(taskUpdates));
     }
 
+    @PutMapping("/tasks/billing-status/partial")
+    @Operation(summary = "Bill next partial contract portion", description = "Assigns an invoice ID to the next unbilled contract portion of a partially billed task")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Task updated successfully"),
+        @ApiResponse(responseCode = "400", description = "Invalid input"),
+        @ApiResponse(responseCode = "401", description = "Unauthorized"),
+        @ApiResponse(responseCode = "404", description = "Task not found"),
+        @ApiResponse(responseCode = "500", description = "Internal server error")
+    })
+    @PreAuthorize("hasRole('ADMIN','USER')")
+    public ResponseEntity<TaskDTO> billNextPartialPortion(
+            @Valid @RequestBody TaskPartialBillingUpdateDTO update) {
+        return ResponseEntity.ok(taskService.billNextPartialPortion(update));
+    }
+
     @PutMapping("/tasks/payment-status")
     @Operation(summary = "Update payment status for multiple tasks", description = "Updates the payment status for a list of tasks")
     @ApiResponses(value = {
@@ -378,6 +395,21 @@ public class TaskController {
             @Parameter(description = "List of task IDs and their payment status", required = true)
             @Valid @RequestBody List<TaskPaymentStatusUpdateDTO> taskUpdates) {
         return ResponseEntity.ok(taskService.updateTasksPaymentStatus(taskUpdates));
+    }
+
+    @PutMapping("/tasks/payment-status/partial")
+    @Operation(summary = "Pay next partial contract portion", description = "Marks the next unpaid billed contract portion as paid")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Task updated successfully"),
+        @ApiResponse(responseCode = "400", description = "Invalid input"),
+        @ApiResponse(responseCode = "401", description = "Unauthorized"),
+        @ApiResponse(responseCode = "404", description = "Task not found"),
+        @ApiResponse(responseCode = "500", description = "Internal server error")
+    })
+    @PreAuthorize("hasRole('ADMIN','USER')")
+    public ResponseEntity<TaskDTO> payNextPartialPortion(
+            @Valid @RequestBody TaskPartialPaymentUpdateDTO update) {
+        return ResponseEntity.ok(taskService.payNextPartialPortion(update));
     }
 
     @GetMapping("/tasks/sal/pdf")
@@ -412,9 +444,12 @@ public class TaskController {
             
             List<TaskDTO> tasks;
             if (taskIds != null && !taskIds.isEmpty()) {
-                List<Task> selectedTasks = taskRepository.findAllById(taskIds);
-                tasks = selectedTasks.stream()
+                java.util.Map<Long, Task> taskById = taskRepository.findAllById(taskIds).stream()
                     .filter(t -> t.getUserEmail().equals(userEmail))
+                    .collect(java.util.stream.Collectors.toMap(Task::getId, t -> t));
+                tasks = taskIds.stream()
+                    .map(taskById::get)
+                    .filter(java.util.Objects::nonNull)
                     .map(this::convertTaskToDTO)
                     .collect(java.util.stream.Collectors.toList());
             } else if (projectId != null) {
@@ -644,13 +679,19 @@ public class TaskController {
     }
 
     private TaskDTO convertTaskToDTO(Task task) {
-        List<TaskContractUsage> usages = taskContractUsageRepository.findByTaskId(task.getId());
+        List<TaskContractUsage> usages = taskContractUsageRepository.findByTaskIdOrderByIdAsc(task.getId());
         List<TaskContractUsageDTO> usageDTOs = usages != null && !usages.isEmpty()
                 ? usages.stream()
                     .map(u -> TaskContractUsageDTO.builder()
+                            .id(u.getId())
                             .contractId(u.getContract().getId())
                             .contractCode(u.getContractCode())
                             .amountUsed(u.getAmountUsed())
+                            .invoiceId(u.getInvoiceId())
+                            .billingDate(u.getBillingDate())
+                            .paymentDate(u.getPaymentDate())
+                            .isBilled(u.getInvoiceId() != null && !u.getInvoiceId().isBlank())
+                            .isPaid(u.getPaymentDate() != null)
                             .build())
                     .collect(java.util.stream.Collectors.toList())
                 : null;
@@ -670,7 +711,9 @@ public class TaskController {
                 .type(task.getType())
                 .currency(task.getCurrency())
                 .isBilled(task.getIsBilled())
+                .isPartiallyBilled(task.getIsPartiallyBilled())
                 .isPaid(task.getIsPaid())
+                .isPartiallyPaid(task.getIsPartiallyPaid())
                 .billingDate(task.getBillingDate())
                 .paymentDate(task.getPaymentDate())
                 .invoiceId(task.getInvoiceId())

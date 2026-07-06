@@ -18,4 +18,6 @@ public class TaskPaymentStatusUpdateDTO {
 
     @NotNull(message = "Payment date is required")
     private LocalDate paymentDate;
+
+    private String paymentDates;
 } 

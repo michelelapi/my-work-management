@@ -1,6 +1,8 @@
 package com.myworkmanagement.company.service;
 
 import com.myworkmanagement.company.dto.TaskBillingStatusUpdateDTO;
+import com.myworkmanagement.company.dto.TaskPartialBillingUpdateDTO;
+import com.myworkmanagement.company.dto.TaskPartialPaymentUpdateDTO;
 import com.myworkmanagement.company.dto.TaskPaymentStatusUpdateDTO;
 import com.myworkmanagement.company.dto.TaskDTO;
 import org.springframework.data.domain.Page;
@@ -50,6 +52,8 @@ public interface TaskService {
      */
     List<TaskDTO> updateTasksBillingStatus(List<TaskBillingStatusUpdateDTO> taskUpdates);
 
+    TaskDTO billNextPartialPortion(TaskPartialBillingUpdateDTO update);
+
     /**
      * Updates the payment status for multiple tasks
      * @param taskUpdates List of task updates containing task IDs and their new payment status
@@ -57,4 +61,6 @@ public interface TaskService {
      * @throws TaskPaymentStatusException if any task is not found or update fails
      */
     List<TaskDTO> updateTasksPaymentStatus(List<TaskPaymentStatusUpdateDTO> taskUpdates);
+
+    TaskDTO payNextPartialPortion(TaskPartialPaymentUpdateDTO update);
 } 

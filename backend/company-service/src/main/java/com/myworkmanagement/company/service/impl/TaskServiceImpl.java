@@ -3,6 +3,8 @@ package com.myworkmanagement.company.service.impl;
 import com.myworkmanagement.company.dto.TaskBillingStatusUpdateDTO;
 import com.myworkmanagement.company.dto.TaskContractUsageDTO;
 import com.myworkmanagement.company.dto.TaskDTO;
+import com.myworkmanagement.company.dto.TaskPartialBillingUpdateDTO;
+import com.myworkmanagement.company.dto.TaskPartialPaymentUpdateDTO;
 import com.myworkmanagement.company.dto.TaskPaymentStatusUpdateDTO;
 import com.myworkmanagement.company.entity.Client;
 import com.myworkmanagement.company.entity.Contract;
@@ -36,6 +38,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -476,19 +479,24 @@ public class TaskServiceImpl implements TaskService {
                 .orElseThrow(() -> new TaskBillingStatusException("Task not found with id: " + update.getTaskId()));
             
             boolean wasBilled = Boolean.TRUE.equals(task.getIsBilled());
+            boolean wasPartiallyBilled = Boolean.TRUE.equals(task.getIsPartiallyBilled());
             boolean nowBilled = Boolean.TRUE.equals(update.getIsBilled());
 
-            task.setIsBilled(update.getIsBilled());
-            task.setBillingDate(update.getIsBilled()?update.getBillingDate():null);
-            task.setInvoiceId(update.getIsBilled()?update.getInvoiceId():null);
-            Task savedTask = taskRepository.save(task);
-
-            if (nowBilled && !wasBilled) {
-                allocateTaskCostToContracts(savedTask);
-            } else if (!nowBilled && wasBilled) {
-                reverseTaskContractUsages(savedTask);
+            if (nowBilled && !wasBilled && !wasPartiallyBilled) {
+                allocateTaskCostToContracts(task);
+                applyInvoiceIdsToContractUsages(task, update.getInvoiceId(), update.getBillingDate());
+            } else if (!nowBilled && (wasBilled || wasPartiallyBilled)) {
+                reverseTaskContractUsages(task);
+                task.setIsBilled(false);
+                task.setIsPartiallyBilled(false);
+                task.setBillingDate(null);
+                task.setInvoiceId(null);
+            } else if (nowBilled) {
+                task.setBillingDate(update.getBillingDate());
+                task.setInvoiceId(update.getInvoiceId());
             }
 
+            Task savedTask = taskRepository.save(task);
             updatedTasks.add(convertToDTO(savedTask));
 
             googleSheetsService.updateTaskRowByTicketId(savedTask.getTicketId(), mapTaskToSheetRow(savedTask))
@@ -499,6 +507,121 @@ public class TaskServiceImpl implements TaskService {
         }
 
         return updatedTasks;
+    }
+
+    @Override
+    @Transactional
+    public TaskDTO billNextPartialPortion(TaskPartialBillingUpdateDTO update) {
+        Task task = taskRepository.findById(update.getTaskId())
+            .orElseThrow(() -> new TaskBillingStatusException("Task not found with id: " + update.getTaskId()));
+
+        if (!Boolean.TRUE.equals(task.getIsPartiallyBilled())) {
+            throw new TaskBillingStatusException("Task is not partially billed");
+        }
+
+        TaskContractUsage nextUsage = taskContractUsageRepository.findByTaskIdOrderByIdAsc(task.getId()).stream()
+            .filter(usage -> usage.getInvoiceId() == null || usage.getInvoiceId().isBlank())
+            .findFirst()
+            .orElseThrow(() -> new TaskBillingStatusException("No remaining contract portion to bill"));
+
+        billContractUsage(nextUsage, update.getInvoiceId(), update.getBillingDate());
+        syncTaskBillingState(task);
+        Task savedTask = taskRepository.save(task);
+
+        googleSheetsService.updateTaskRowByTicketId(savedTask.getTicketId(), mapTaskToSheetRow(savedTask))
+            .exceptionally(ex -> {
+                logger.error("Failed to update task in Google Sheets: {}", ex.getMessage());
+                return null;
+            });
+
+        return convertToDTO(savedTask);
+    }
+
+    private List<String> parseInvoiceIds(String invoiceIdInput) {
+        if (invoiceIdInput == null || invoiceIdInput.isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(invoiceIdInput.split(","))
+            .map(String::trim)
+            .filter(s -> !s.isEmpty())
+            .collect(Collectors.toList());
+    }
+
+    private void billContractUsage(TaskContractUsage usage, String invoiceId, LocalDate billingDate) {
+        usage.setInvoiceId(invoiceId.trim());
+        usage.setBillingDate(billingDate);
+        taskContractUsageRepository.save(usage);
+    }
+
+    private void applyInvoiceIdsToContractUsages(Task task, String invoiceIdInput, LocalDate billingDate) {
+        List<TaskContractUsage> usages = taskContractUsageRepository.findByTaskIdOrderByIdAsc(task.getId());
+        if (usages.isEmpty()) {
+            List<String> invoiceIds = parseInvoiceIds(invoiceIdInput);
+            if (invoiceIds.isEmpty()) {
+                throw new TaskBillingStatusException("Invoice ID is required when marking a task as billed");
+            }
+            task.setIsBilled(true);
+            task.setIsPartiallyBilled(false);
+            task.setInvoiceId(invoiceIds.get(0));
+            task.setBillingDate(billingDate);
+            return;
+        }
+
+        List<String> invoiceIds = parseInvoiceIds(invoiceIdInput);
+        if (invoiceIds.isEmpty()) {
+            throw new TaskBillingStatusException("Invoice ID is required when marking a task as billed");
+        }
+
+        if (invoiceIds.size() == 1 && usages.size() > 1) {
+            billContractUsage(usages.get(0), invoiceIds.get(0), billingDate);
+        } else {
+            int limit = Math.min(invoiceIds.size(), usages.size());
+            for (int i = 0; i < limit; i++) {
+                billContractUsage(usages.get(i), invoiceIds.get(i), billingDate);
+            }
+        }
+
+        syncTaskBillingState(task);
+    }
+
+    private void syncTaskBillingState(Task task) {
+        List<TaskContractUsage> usages = taskContractUsageRepository.findByTaskIdOrderByIdAsc(task.getId());
+        if (usages.isEmpty()) {
+            return;
+        }
+
+        List<TaskContractUsage> billedUsages = usages.stream()
+            .filter(usage -> usage.getInvoiceId() != null && !usage.getInvoiceId().isBlank())
+            .collect(Collectors.toList());
+
+        if (billedUsages.isEmpty()) {
+            task.setIsBilled(false);
+            task.setIsPartiallyBilled(false);
+            task.setInvoiceId(null);
+            task.setBillingDate(null);
+            return;
+        }
+
+        String combinedInvoices = billedUsages.stream()
+            .map(TaskContractUsage::getInvoiceId)
+            .collect(Collectors.joining(", "));
+
+        LocalDate earliestBillingDate = billedUsages.stream()
+            .map(TaskContractUsage::getBillingDate)
+            .filter(Objects::nonNull)
+            .min(LocalDate::compareTo)
+            .orElse(null);
+
+        task.setInvoiceId(combinedInvoices);
+        task.setBillingDate(earliestBillingDate);
+
+        if (billedUsages.size() == usages.size()) {
+            task.setIsBilled(true);
+            task.setIsPartiallyBilled(false);
+        } else {
+            task.setIsBilled(false);
+            task.setIsPartiallyBilled(true);
+        }
     }
 
     private void allocateTaskCostToContracts(Task task) {
@@ -568,9 +691,22 @@ public class TaskServiceImpl implements TaskService {
         for (TaskPaymentStatusUpdateDTO update : taskUpdates) {
             Task task = taskRepository.findById(update.getTaskId())
                 .orElseThrow(() -> new TaskPaymentStatusException("Task not found with id: " + update.getTaskId()));
-            
-            task.setIsPaid(update.getIsPaid());
-            task.setPaymentDate(update.getIsPaid()?update.getPaymentDate():null);
+
+            boolean wasPaid = Boolean.TRUE.equals(task.getIsPaid());
+            boolean wasPartiallyPaid = Boolean.TRUE.equals(task.getIsPartiallyPaid());
+            boolean nowPaid = Boolean.TRUE.equals(update.getIsPaid());
+
+            if (nowPaid && !wasPaid && !wasPartiallyPaid) {
+                applyPaymentDatesToContractUsages(task, update);
+            } else if (!nowPaid && (wasPaid || wasPartiallyPaid)) {
+                clearContractUsagePayments(task);
+                task.setIsPaid(false);
+                task.setIsPartiallyPaid(false);
+                task.setPaymentDate(null);
+            } else if (nowPaid) {
+                task.setPaymentDate(update.getPaymentDate());
+            }
+
             Task savedTask = taskRepository.save(task);
             updatedTasks.add(convertToDTO(savedTask));
 
@@ -582,6 +718,132 @@ public class TaskServiceImpl implements TaskService {
         }
         
         return updatedTasks;
+    }
+
+    @Override
+    @Transactional
+    public TaskDTO payNextPartialPortion(TaskPartialPaymentUpdateDTO update) {
+        Task task = taskRepository.findById(update.getTaskId())
+            .orElseThrow(() -> new TaskPaymentStatusException("Task not found with id: " + update.getTaskId()));
+
+        TaskContractUsage nextUsage = getPayableUsages(task.getId()).stream()
+            .filter(usage -> usage.getPaymentDate() == null)
+            .findFirst()
+            .orElseThrow(() -> new TaskPaymentStatusException("No remaining contract portion to pay"));
+
+        payContractUsage(nextUsage, update.getPaymentDate());
+        syncTaskPaymentState(task);
+        Task savedTask = taskRepository.save(task);
+
+        googleSheetsService.updateTaskRowByTicketId(savedTask.getTicketId(), mapTaskToSheetRow(savedTask))
+            .exceptionally(ex -> {
+                logger.error("Failed to update task in Google Sheets: {}", ex.getMessage());
+                return null;
+            });
+
+        return convertToDTO(savedTask);
+    }
+
+    private List<LocalDate> parsePaymentDates(TaskPaymentStatusUpdateDTO update) {
+        if (update.getPaymentDates() != null && !update.getPaymentDates().isBlank()) {
+            return Arrays.stream(update.getPaymentDates().split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .map(LocalDate::parse)
+                .collect(Collectors.toList());
+        }
+        if (update.getPaymentDate() != null) {
+            return List.of(update.getPaymentDate());
+        }
+        return List.of();
+    }
+
+    private List<TaskContractUsage> getPayableUsages(Long taskId) {
+        return taskContractUsageRepository.findByTaskIdOrderByIdAsc(taskId).stream()
+            .filter(usage -> usage.getInvoiceId() != null && !usage.getInvoiceId().isBlank())
+            .collect(Collectors.toList());
+    }
+
+    private void payContractUsage(TaskContractUsage usage, LocalDate paymentDate) {
+        usage.setPaymentDate(paymentDate);
+        taskContractUsageRepository.save(usage);
+    }
+
+    private void clearContractUsagePayments(Task task) {
+        for (TaskContractUsage usage : taskContractUsageRepository.findByTaskIdOrderByIdAsc(task.getId())) {
+            usage.setPaymentDate(null);
+            taskContractUsageRepository.save(usage);
+        }
+    }
+
+    private void applyPaymentDatesToContractUsages(Task task, TaskPaymentStatusUpdateDTO update) {
+        List<TaskContractUsage> payableUsages = getPayableUsages(task.getId());
+        List<LocalDate> paymentDates = parsePaymentDates(update);
+
+        if (payableUsages.isEmpty()) {
+            if (paymentDates.isEmpty()) {
+                throw new TaskPaymentStatusException("Payment date is required when marking a task as paid");
+            }
+            if (Boolean.TRUE.equals(task.getIsPartiallyBilled())) {
+                throw new TaskPaymentStatusException("Cannot mark as paid: no billed contract portions yet");
+            }
+            task.setIsPaid(true);
+            task.setIsPartiallyPaid(false);
+            task.setPaymentDate(paymentDates.get(0));
+            return;
+        }
+
+        if (paymentDates.isEmpty()) {
+            throw new TaskPaymentStatusException("Payment date is required when marking a task as paid");
+        }
+
+        if (paymentDates.size() == 1 && payableUsages.size() > 1) {
+            payContractUsage(payableUsages.get(0), paymentDates.get(0));
+        } else {
+            int limit = Math.min(paymentDates.size(), payableUsages.size());
+            for (int i = 0; i < limit; i++) {
+                payContractUsage(payableUsages.get(i), paymentDates.get(i));
+            }
+        }
+
+        syncTaskPaymentState(task);
+    }
+
+    private void syncTaskPaymentState(Task task) {
+        List<TaskContractUsage> payableUsages = getPayableUsages(task.getId());
+        if (payableUsages.isEmpty()) {
+            return;
+        }
+
+        List<TaskContractUsage> paidUsages = payableUsages.stream()
+            .filter(usage -> usage.getPaymentDate() != null)
+            .collect(Collectors.toList());
+
+        if (paidUsages.isEmpty()) {
+            task.setIsPaid(false);
+            task.setIsPartiallyPaid(false);
+            task.setPaymentDate(null);
+            return;
+        }
+
+        LocalDate earliestPaymentDate = paidUsages.stream()
+            .map(TaskContractUsage::getPaymentDate)
+            .filter(Objects::nonNull)
+            .min(LocalDate::compareTo)
+            .orElse(null);
+
+        task.setPaymentDate(earliestPaymentDate);
+
+        boolean allPayablePaid = paidUsages.size() == payableUsages.size();
+        boolean billingComplete = !Boolean.TRUE.equals(task.getIsPartiallyBilled());
+
+        if (allPayablePaid && billingComplete) {
+            task.setIsPaid(true);
+            task.setIsPartiallyPaid(false);
+        } else {
+            task.setIsPaid(false);
+            task.setIsPartiallyPaid(true);
+        }
     }
 
     private TaskDTO convertToDTO(Task task) {
@@ -599,7 +861,9 @@ public class TaskServiceImpl implements TaskService {
                 .type(task.getType())
                 .currency(task.getCurrency())
                 .isBilled(task.getIsBilled())
+                .isPartiallyBilled(task.getIsPartiallyBilled())
                 .isPaid(task.getIsPaid())
+                .isPartiallyPaid(task.getIsPartiallyPaid())
                 .billingDate(task.getBillingDate())
                 .paymentDate(task.getPaymentDate())
                 .invoiceId(task.getInvoiceId())
@@ -614,13 +878,19 @@ public class TaskServiceImpl implements TaskService {
                    .clientName(task.getClient().getName());
         }
 
-        List<TaskContractUsage> usages = taskContractUsageRepository.findByTaskId(task.getId());
+        List<TaskContractUsage> usages = taskContractUsageRepository.findByTaskIdOrderByIdAsc(task.getId());
         if (usages != null && !usages.isEmpty()) {
             builder.contractUsages(usages.stream()
                     .map(u -> TaskContractUsageDTO.builder()
+                            .id(u.getId())
                             .contractId(u.getContract().getId())
                             .contractCode(u.getContractCode())
                             .amountUsed(u.getAmountUsed())
+                            .invoiceId(u.getInvoiceId())
+                            .billingDate(u.getBillingDate())
+                            .paymentDate(u.getPaymentDate())
+                            .isBilled(u.getInvoiceId() != null && !u.getInvoiceId().isBlank())
+                            .isPaid(u.getPaymentDate() != null)
                             .build())
                     .collect(Collectors.toList()));
         }

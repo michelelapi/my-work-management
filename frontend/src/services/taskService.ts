@@ -20,6 +20,7 @@ export interface TaskPaymentStatusUpdate {
     taskId: number;
     isPaid: boolean;
     paymentDate: string;
+    paymentDates?: string;
 }
 
 export const taskService = {
@@ -172,8 +173,25 @@ export const taskService = {
         return response.data;
     },
 
+    async billNextPartialPortion(taskId: number, invoiceId: string, billingDate: string): Promise<Task> {
+        const response = await api.put<Task>(`/tasks/billing-status/partial`, {
+            taskId,
+            invoiceId,
+            billingDate
+        });
+        return response.data;
+    },
+
     async updateTasksPaymentStatus(taskUpdates: TaskPaymentStatusUpdate[]): Promise<Task[]> {
         const response = await api.put<Task[]>(`/tasks/payment-status`, taskUpdates);
+        return response.data;
+    },
+
+    async payNextPartialPortion(taskId: number, paymentDate: string): Promise<Task> {
+        const response = await api.put<Task>(`/tasks/payment-status/partial`, {
+            taskId,
+            paymentDate
+        });
         return response.data;
     },
 
@@ -211,13 +229,16 @@ export const taskService = {
             params.projectName = projectName;
         }
         if (taskIds && taskIds.length > 0) {
-            params.taskIds = taskIds.join(',');
+            params.taskIds = taskIds;
         }
         if (contractId !== undefined) {
             params.contractId = contractId;
         }
         const response = await api.get('/tasks/sal/pdf', {
             params,
+            paramsSerializer: {
+                indexes: null
+            },
             responseType: 'blob',
             ...(skipReminderCheck ? { _skipReminderCheck: true } : {})
         });

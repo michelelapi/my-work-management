@@ -1,7 +1,13 @@
 export interface ContractUsage {
+    id?: number;
     contractId: number;
     contractCode: string;
     amountUsed: number;
+    invoiceId?: string;
+    billingDate?: string;
+    paymentDate?: string;
+    isBilled?: boolean;
+    isPaid?: boolean;
 }
 
 export interface Contract {

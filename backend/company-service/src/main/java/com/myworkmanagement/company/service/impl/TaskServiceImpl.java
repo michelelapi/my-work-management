@@ -81,6 +81,16 @@ public class TaskServiceImpl implements TaskService {
             taskDTO.setCurrency(currency);
         }
 
+        Boolean isPartiallyBilled = taskDTO.getIsPartiallyBilled();
+        if (isPartiallyBilled == null) {
+            isPartiallyBilled = false;
+        }
+
+        Boolean isPartiallyPaid = taskDTO.getIsPartiallyPaid();
+        if (isPartiallyPaid == null) {
+            isPartiallyPaid = false;
+        }
+
         // Fetch client if clientId is provided
         Client client = null;
         if (taskDTO.getClientId() != null) {
@@ -100,7 +110,9 @@ public class TaskServiceImpl implements TaskService {
                 .type(type)
                 .currency(currency)
                 .isBilled(taskDTO.getIsBilled())
+                .isPartiallyBilled(isPartiallyBilled)
                 .isPaid(taskDTO.getIsPaid())
+                .isPartiallyPaid(isPartiallyPaid)
                 .billingDate(taskDTO.getBillingDate())
                 .paymentDate(taskDTO.getPaymentDate())
                 .invoiceId(taskDTO.getInvoiceId())

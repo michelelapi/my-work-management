@@ -207,7 +207,8 @@ export const taskService = {
         projectName?: string,
         skipReminderCheck: boolean = false,
         taskIds?: number[],
-        contractId?: number
+        contractId?: number,
+        note?: string
     ): Promise<{ blob: Blob; contentType: string; filename: string }> {
         const params: any = { year, month };
         if (projectId !== undefined) {
@@ -233,6 +234,9 @@ export const taskService = {
         }
         if (contractId !== undefined) {
             params.contractId = contractId;
+        }
+        if (note) {
+            params.note = note;
         }
         const response = await api.get('/tasks/sal/pdf', {
             params,

@@ -1046,7 +1046,7 @@ const TaskListPage: React.FC = () => {
         }
     };
 
-    const handleSalModalGenerate = async (orderedTaskIds: number[]) => {
+    const handleSalModalGenerate = async (orderedTaskIds: number[], note: string) => {
         if (!salModalPeriod) return;
 
         try {
@@ -1061,7 +1061,9 @@ const TaskListPage: React.FC = () => {
                 undefined,
                 undefined,
                 true,
-                orderedTaskIds
+                orderedTaskIds,
+                undefined,
+                note || undefined
             );
             downloadSalBlob(result.blob, result.filename);
             setSalModalOpen(false);

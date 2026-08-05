@@ -17,9 +17,13 @@ import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.stream.IntStream;
 
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
@@ -64,6 +68,83 @@ public class SalPdfService {
         return "No Client";
     }
 
+    private YearMonth resolveTaskYearMonth(TaskDTO task) {
+        if (task.getStartDate() == null) {
+            return null;
+        }
+        return YearMonth.from(task.getStartDate());
+    }
+
+    private String resolveTaskMonthLabel(TaskDTO task) {
+        YearMonth yearMonth = resolveTaskYearMonth(task);
+        if (yearMonth == null) {
+            return "N/D";
+        }
+        return yearMonth.format(MONTH_FORMATTER);
+    }
+
+    /**
+     * Groups tasks by month (from startDate) then by client, preserving relative order within each group.
+     */
+    private List<TaskDTO> groupTasksByMonthAndClient(List<TaskDTO> tasks) {
+        return IntStream.range(0, tasks.size())
+            .boxed()
+            .sorted(Comparator
+                .comparing((Integer i) -> resolveTaskYearMonth(tasks.get(i)),
+                    Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(i -> resolveClientName(tasks.get(i)), String.CASE_INSENSITIVE_ORDER)
+                .thenComparingInt(i -> i))
+            .map(tasks::get)
+            .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+    }
+
+    /**
+     * Draws the horizontal line and column titles (N° Task, Descrizione, Ore, Importo, Importo+IVA).
+     * @return the y position after drawing the header
+     */
+    private float drawTableColumnHeaders(PDPageContentStream contentStream, float yPosition,
+                                         float margin, float pageWidth,
+                                         float col1X, float col2X, float col3X, float col4X, float col5X)
+            throws IOException {
+        contentStream.setLineWidth(1f);
+        contentStream.moveTo(margin, yPosition);
+        contentStream.lineTo(pageWidth - margin, yPosition);
+        contentStream.stroke();
+
+        yPosition -= 20;
+        contentStream.beginText();
+        contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 9);
+        contentStream.newLineAtOffset(col1X, yPosition);
+        contentStream.showText("N° Task");
+        contentStream.endText();
+
+        contentStream.beginText();
+        contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 9);
+        contentStream.newLineAtOffset(col2X, yPosition);
+        contentStream.showText("Descrizione");
+        contentStream.endText();
+
+        contentStream.beginText();
+        contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 9);
+        contentStream.newLineAtOffset(col3X, yPosition);
+        contentStream.showText("Ore");
+        contentStream.endText();
+
+        contentStream.beginText();
+        contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 9);
+        contentStream.newLineAtOffset(col4X, yPosition);
+        contentStream.showText("Importo");
+        contentStream.endText();
+
+        contentStream.beginText();
+        contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 9);
+        contentStream.newLineAtOffset(col5X, yPosition);
+        contentStream.showText("Importo+IVA");
+        contentStream.endText();
+
+        return yPosition;
+    }
+
     /**
      * Formats a number using Italian format (thousands separator: dot, decimal: comma)
      */
@@ -103,19 +184,54 @@ public class SalPdfService {
     }
 
     /**
+     * Adds page numbers at the bottom-right corner of every page.
+     */
+    private void addPageNumbers(PDDocument document, float margin) throws IOException {
+        int totalPages = document.getNumberOfPages();
+        PDType1Font font = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
+        float fontSize = 9f;
+        float bottomY = 25f;
+
+        for (int i = 0; i < totalPages; i++) {
+            PDPage page = document.getPage(i);
+            float pageWidth = page.getMediaBox().getWidth();
+            String pageLabel = (i + 1) + " / " + totalPages;
+            float textWidth = font.getStringWidth(pageLabel) / 1000 * fontSize;
+
+            try (PDPageContentStream pageStream = new PDPageContentStream(
+                    document, page, PDPageContentStream.AppendMode.APPEND, true, true)) {
+                pageStream.beginText();
+                pageStream.setFont(font, fontSize);
+                pageStream.newLineAtOffset(pageWidth - margin - textWidth, bottomY);
+                pageStream.showText(pageLabel);
+                pageStream.endText();
+            }
+        }
+    }
+
+    /**
      * Generates a SAL PDF document matching the formal Italian business document format
      */
     public byte[] generateSalPdf(List<TaskDTO> tasks, String userEmail, String userName, 
                                  String userAddress, String userPhone, String userEmailAddress,
                                  String projectName, LocalDate reportMonth) throws IOException {
         return generateSalPdf(tasks, userEmail, userName, userAddress, userPhone, 
-            userEmailAddress, projectName, reportMonth, null, null);
+            userEmailAddress, projectName, reportMonth, null, null, null);
     }
 
     public byte[] generateSalPdf(List<TaskDTO> tasks, String userEmail, String userName, 
                                  String userAddress, String userPhone, String userEmailAddress,
                                  String projectName, LocalDate reportMonth,
                                  String contractCode, java.math.BigDecimal contractAmountAvailable) throws IOException {
+        return generateSalPdf(tasks, userEmail, userName, userAddress, userPhone,
+            userEmailAddress, projectName, reportMonth, contractCode, contractAmountAvailable, null);
+    }
+
+    public byte[] generateSalPdf(List<TaskDTO> tasks, String userEmail, String userName, 
+                                 String userAddress, String userPhone, String userEmailAddress,
+                                 String projectName, LocalDate reportMonth,
+                                 String contractCode, java.math.BigDecimal contractAmountAvailable,
+                                 String note) throws IOException {
         
         if (tasks == null || tasks.isEmpty()) {
             throw new IllegalArgumentException("Cannot generate SAL PDF: no tasks provided");
@@ -318,8 +434,33 @@ public class SalPdfService {
             yPosition -= 15;
         }
 
-        // Table header
-        yPosition -= 20;
+        // Optional note section — only when note text is provided (before task table)
+        if (note != null && !note.trim().isEmpty()) {
+            String sanitizedNote = sanitizeTextForPdf(note.trim());
+            float noteMaxWidth = pageWidth - 2 * margin;
+            PDType1Font noteFont = new PDType1Font(Standard14Fonts.FontName.HELVETICA_OBLIQUE);
+            java.util.List<String> noteLines = wrapText(sanitizedNote , noteMaxWidth, noteFont, 10);
+
+            yPosition -= 20;
+            contentStream.beginText();
+            contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD_OBLIQUE), 10);
+            contentStream.newLineAtOffset(margin, yPosition);
+            contentStream.showText("NOTE:");
+            contentStream.endText();
+
+            yPosition -= 18;
+            for (String line : noteLines) {
+                contentStream.beginText();
+                contentStream.setFont(noteFont, 10);
+                contentStream.newLineAtOffset(margin, yPosition);
+                contentStream.showText(line);
+                contentStream.endText();
+                yPosition -= 15;
+            }
+        }
+
+        // Column layout — month header + table columns are drawn per month section
+        yPosition -= 10;
         float col1X = margin; // N° Task
         float col2X = margin + 70; // Descrizione
         float col3X = pageWidth - margin - 200; // Ore
@@ -327,60 +468,62 @@ public class SalPdfService {
         float col5X = pageWidth - margin - 80; // Importo+IVA
         float descMaxWidth = col3X - col2X - 10; // Max width for description column
 
-        // Draw table header
-        contentStream.setLineWidth(1f);
-        contentStream.moveTo(margin, yPosition);
-        contentStream.lineTo(pageWidth - margin, yPosition);
-        contentStream.stroke();
+        // Table rows — group by month then client
+        List<TaskDTO> groupedTasks = groupTasksByMonthAndClient(tasks);
 
-        yPosition -= 20;
-        contentStream.beginText();
-        contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 9);
-        contentStream.newLineAtOffset(col1X, yPosition);
-        contentStream.showText("N° Task");
-        contentStream.endText();
-
-        contentStream.beginText();
-        contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 9);
-        contentStream.newLineAtOffset(col2X, yPosition);
-        contentStream.showText("Descrizione");
-        contentStream.endText();
-
-        contentStream.beginText();
-        contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 9);
-        contentStream.newLineAtOffset(col3X, yPosition);
-        contentStream.showText("Ore");
-        contentStream.endText();
-
-        contentStream.beginText();
-        contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 9);
-        contentStream.newLineAtOffset(col4X, yPosition);
-        contentStream.showText("Importo");
-        contentStream.endText();
-
-        contentStream.beginText();
-        contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 9);
-        contentStream.newLineAtOffset(col5X, yPosition);
-        contentStream.showText("Importo+IVA");
-        contentStream.endText();
-
-        // Table rows - preserve task list order; client headers/subtotals only on contiguous blocks
         BigDecimal totalHours = BigDecimal.ZERO;
         BigDecimal totalAmount = BigDecimal.ZERO;
         BigDecimal totalAmountWithVat = BigDecimal.ZERO;
 
-        long distinctClientCount = tasks.stream().map(this::resolveClientName).distinct().count();
+        long distinctClientCount = groupedTasks.stream().map(this::resolveClientName).distinct().count();
         boolean multipleClients = distinctClientCount > 1;
 
+        String activeMonthLabel = null;
         String activeClient = null;
         BigDecimal clientHours = BigDecimal.ZERO;
         BigDecimal clientAmount = BigDecimal.ZERO;
         BigDecimal clientAmountWithVat = BigDecimal.ZERO;
+        BigDecimal monthHours = BigDecimal.ZERO;
+        BigDecimal monthAmount = BigDecimal.ZERO;
+        BigDecimal monthAmountWithVat = BigDecimal.ZERO;
 
-        for (int i = 0; i < tasks.size(); i++) {
-            TaskDTO task = tasks.get(i);
+        for (int i = 0; i < groupedTasks.size(); i++) {
+            TaskDTO task = groupedTasks.get(i);
+            String monthLabel = resolveTaskMonthLabel(task);
             String clientName = resolveClientName(task);
-            String nextClient = (i + 1 < tasks.size()) ? resolveClientName(tasks.get(i + 1)) : null;
+            String nextMonthLabel = (i + 1 < groupedTasks.size())
+                ? resolveTaskMonthLabel(groupedTasks.get(i + 1)) : null;
+            String nextClient = (i + 1 < groupedTasks.size())
+                ? resolveClientName(groupedTasks.get(i + 1)) : null;
+
+            boolean monthChanged = !monthLabel.equals(activeMonthLabel);
+            if (monthChanged) {
+                if (yPosition < 240) {
+                    contentStream.close();
+                    PDPage newPage = new PDPage();
+                    document.addPage(newPage);
+                    contentStream = new PDPageContentStream(document, newPage);
+                    yPosition = pageHeight - margin - 40;
+                }
+
+                // Month/year label, then the line + column titles
+                yPosition -= 25;
+                contentStream.beginText();
+                contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 12);
+                contentStream.newLineAtOffset(margin, yPosition);
+                contentStream.showText("Mese: " + monthLabel);
+                contentStream.endText();
+
+                yPosition -= 15;
+                yPosition = drawTableColumnHeaders(contentStream, yPosition, margin, pageWidth,
+                    col1X, col2X, col3X, col4X, col5X);
+
+                activeMonthLabel = monthLabel;
+                activeClient = null; // reprint client header under the new month
+                monthHours = BigDecimal.ZERO;
+                monthAmount = BigDecimal.ZERO;
+                monthAmountWithVat = BigDecimal.ZERO;
+            }
 
             if (!clientName.equals(activeClient)) {
                 if (!"No Client".equals(clientName)) {
@@ -390,6 +533,8 @@ public class SalPdfService {
                         document.addPage(newPage);
                         contentStream = new PDPageContentStream(document, newPage);
                         yPosition = pageHeight - margin - 40;
+                        yPosition = drawTableColumnHeaders(contentStream, yPosition, margin, pageWidth,
+                            col1X, col2X, col3X, col4X, col5X);
                     }
 
                     yPosition -= 25;
@@ -431,32 +576,8 @@ public class SalPdfService {
                     document.addPage(newPage);
                     contentStream = new PDPageContentStream(document, newPage);
                     yPosition = pageHeight - margin - 40;
-                    // Redraw table header on new page
-                    contentStream.beginText();
-                    contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 9);
-                    contentStream.newLineAtOffset(col1X, yPosition);
-                    contentStream.showText("N° Task");
-                    contentStream.endText();
-                    contentStream.beginText();
-                    contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 9);
-                    contentStream.newLineAtOffset(col2X, yPosition);
-                    contentStream.showText("Descrizione");
-                    contentStream.endText();
-                    contentStream.beginText();
-                    contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 9);
-                    contentStream.newLineAtOffset(col3X, yPosition);
-                    contentStream.showText("Ore");
-                    contentStream.endText();
-                    contentStream.beginText();
-                    contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 9);
-                    contentStream.newLineAtOffset(col4X, yPosition);
-                    contentStream.showText("Importo");
-                    contentStream.endText();
-                    contentStream.beginText();
-                    contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 9);
-                    contentStream.newLineAtOffset(col5X, yPosition);
-                    contentStream.showText("Importo+IVA");
-                    contentStream.endText();
+                    yPosition = drawTableColumnHeaders(contentStream, yPosition, margin, pageWidth,
+                        col1X, col2X, col3X, col4X, col5X);
                     yPosition -= 20;
                 }
 
@@ -529,17 +650,23 @@ public class SalPdfService {
                     }
                 }
 
-                // Add to client subtotals
+                // Add to client / month / overall totals
                 clientHours = clientHours.add(hours);
                 clientAmount = clientAmount.add(amount);
                 clientAmountWithVat = clientAmountWithVat.add(amountWithVat);
+
+                monthHours = monthHours.add(hours);
+                monthAmount = monthAmount.add(amount);
+                monthAmountWithVat = monthAmountWithVat.add(amountWithVat);
                 
-                // Add to overall totals
                 totalHours = totalHours.add(hours);
                 totalAmount = totalAmount.add(amount);
                 totalAmountWithVat = totalAmountWithVat.add(amountWithVat);
 
-            boolean endOfClientBlock = nextClient == null || !clientName.equals(nextClient);
+            boolean endOfClientBlock = nextClient == null
+                || !clientName.equals(nextClient)
+                || nextMonthLabel == null
+                || !monthLabel.equals(nextMonthLabel);
             if (endOfClientBlock && (multipleClients || !"No Client".equals(clientName))) {
                 if (yPosition < 100) {
                     contentStream.close();
@@ -581,6 +708,51 @@ public class SalPdfService {
                 contentStream.endText();
                 
                 yPosition -= 20; // Extra space after subtotal
+            }
+
+            // Month subtotal at the end of each month section
+            boolean endOfMonth = nextMonthLabel == null || !monthLabel.equals(nextMonthLabel);
+            if (endOfMonth) {
+                if (yPosition < 100) {
+                    contentStream.close();
+                    PDPage newPage = new PDPage();
+                    document.addPage(newPage);
+                    contentStream = new PDPageContentStream(document, newPage);
+                    yPosition = pageHeight - margin - 40;
+                }
+
+                yPosition -= 15;
+                contentStream.setLineWidth(1f);
+                contentStream.moveTo(margin, yPosition);
+                contentStream.lineTo(pageWidth - margin, yPosition);
+                contentStream.stroke();
+
+                yPosition -= 18;
+                contentStream.beginText();
+                contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 10);
+                contentStream.newLineAtOffset(col2X, yPosition);
+                contentStream.showText("Subtotale " + monthLabel);
+                contentStream.endText();
+
+                contentStream.beginText();
+                contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 10);
+                contentStream.newLineAtOffset(col3X, yPosition);
+                contentStream.showText(formatItalianNumber(monthHours));
+                contentStream.endText();
+
+                contentStream.beginText();
+                contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 10);
+                contentStream.newLineAtOffset(col4X, yPosition);
+                contentStream.showText(formatItalianNumber(monthAmount));
+                contentStream.endText();
+
+                contentStream.beginText();
+                contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 10);
+                contentStream.newLineAtOffset(col5X, yPosition);
+                contentStream.showText(formatItalianNumber(monthAmountWithVat));
+                contentStream.endText();
+
+                yPosition -= 15;
             }
         }
 
@@ -732,6 +904,8 @@ public class SalPdfService {
         }
 
         contentStream.close();
+
+        addPageNumbers(document, margin);
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         document.save(baos);

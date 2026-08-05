@@ -430,7 +430,8 @@ public class TaskController {
             @Parameter(description = "User address for the document", required = false) @RequestParam(required = false) String userAddress,
             @Parameter(description = "User phone for the document", required = false) @RequestParam(required = false) String userPhone,
             @Parameter(description = "User email for the document", required = false) @RequestParam(required = false) String userEmailAddress,
-            @Parameter(description = "Project name for the document", required = false) @RequestParam(required = false) String projectName) {
+            @Parameter(description = "Project name for the document", required = false) @RequestParam(required = false) String projectName,
+            @Parameter(description = "Optional note to include in the SAL PDF", required = false) @RequestParam(required = false) String note) {
         try {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             String userEmail = authentication.getName();
@@ -496,7 +497,7 @@ public class TaskController {
                 BigDecimal remainingAfterSal = computeRemainingAfterSal(contract, salTasks);
                 byte[] pdfBytes = salPdfService.generateSalPdf(salTasks, userEmail, userName,
                     userAddress, userPhone, userEmailAddress, projectName, reportMonth,
-                    contract != null ? contract.getCode() : null, remainingAfterSal);
+                    contract != null ? contract.getCode() : null, remainingAfterSal, note);
 
                 HttpHeaders headers = new HttpHeaders();
                 headers.setContentType(MediaType.APPLICATION_PDF);
@@ -515,7 +516,7 @@ public class TaskController {
 
                 byte[] pdfBytes = salPdfService.generateSalPdf(salTasks, userEmail, userName,
                     userAddress, userPhone, userEmailAddress, projectName, reportMonth,
-                    contract != null ? contract.getCode() : null, remainingAfterSal);
+                    contract != null ? contract.getCode() : null, remainingAfterSal, note);
 
                 String contractCode = contract != null ? contract.getCode() : "no-contract";
                 String entryName = String.format("SAL_%d_%02d_%s.pdf", year, month, contractCode);

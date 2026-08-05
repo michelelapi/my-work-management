@@ -37,7 +37,7 @@ const TaskActionButtons: React.FC<TaskActionButtonsProps> = ({
         <div className="flex flex-wrap gap-2">
             <button
                 onClick={onBillingStatusClick}
-                className="relative bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md transition-colors flex items-center text-sm"
+                className="relative bg-green-500 hover:bg-green-600 text-black px-4 py-2 rounded-md transition-colors flex items-center text-sm"
             >
                 {hasBillingStatusReminder && <ReminderBell />}
                 <FaCheck className="mr-2" />
@@ -45,7 +45,7 @@ const TaskActionButtons: React.FC<TaskActionButtonsProps> = ({
             </button>
             <button
                 onClick={onPaymentStatusClick}
-                className="relative bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md transition-colors flex items-center text-sm"
+                className="relative bg-green-500 hover:bg-green-600 text-black px-4 py-2 rounded-md transition-colors flex items-center text-sm"
             >
                 {hasPaymentStatusReminder && <ReminderBell />}
                 <FaCheck className="mr-2" />
@@ -53,14 +53,14 @@ const TaskActionButtons: React.FC<TaskActionButtonsProps> = ({
             </button>
             <button
                 onClick={onInfoForBillClick}
-                className="relative bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-md transition-colors text-sm"
+                className="relative bg-yellow-500 hover:bg-yellow-600 text-black px-4 py-2 rounded-md transition-colors text-sm"
             >
                 {hasInfoForBillReminder && <ReminderBell />}
                 Info For Bill
             </button>
             <button
                 onClick={onGenerateSalClick}
-                className="relative bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-md transition-colors flex items-center text-sm"
+                className="relative bg-purple-500 hover:bg-purple-600 text-black px-4 py-2 rounded-md transition-colors flex items-center text-sm"
             >
                 {hasGenerateSalReminder && <ReminderBell />}
                 <FaFilePdf className="mr-2" />

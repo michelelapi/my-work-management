@@ -64,20 +64,44 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
         Pageable pageable
     );
 
-    @Query("SELECT COUNT(t) FROM Task t JOIN t.project p WHERE p.company.id = :companyId")
-    Long countByCompanyId(@Param("companyId") Long companyId);
+    @Query("SELECT COUNT(t) FROM Task t JOIN t.project p WHERE p.company.id = :companyId AND t.userEmail = :userEmail")
+    Long countByCompanyIdAndUserEmail(@Param("companyId") Long companyId, @Param("userEmail") String userEmail);
     
-    @Query("SELECT COALESCE(SUM(t.hoursWorked), 0) FROM Task t JOIN t.project p WHERE p.company.id = :companyId")
-    Integer sumHoursByCompanyId(@Param("companyId") Long companyId);
+    @Query("SELECT COALESCE(SUM(t.hoursWorked), 0) FROM Task t JOIN t.project p WHERE p.company.id = :companyId AND t.userEmail = :userEmail")
+    BigDecimal sumHoursByCompanyIdAndUserEmail(@Param("companyId") Long companyId, @Param("userEmail") String userEmail);
     
-    @Query("SELECT COALESCE(SUM(t.rateUsed * t.hoursWorked), 0) FROM Task t JOIN t.project p WHERE p.company.id = :companyId")
-    BigDecimal sumAmountByCompanyId(@Param("companyId") Long companyId);
+    @Query("SELECT COALESCE(SUM(t.rateUsed * t.hoursWorked), 0) FROM Task t JOIN t.project p WHERE p.company.id = :companyId AND t.userEmail = :userEmail")
+    BigDecimal sumAmountByCompanyIdAndUserEmail(@Param("companyId") Long companyId, @Param("userEmail") String userEmail);
 
     @Query("SELECT COALESCE(SUM(t.rateUsed * t.hoursWorked), 0) FROM Task t JOIN t.project p WHERE p.company.id = :companyId AND t.isBilled = :isBilled")
     BigDecimal sumAmountByCompanyIdAndIsBilled(@Param("companyId") Long companyId, @Param("isBilled") boolean isBilled);
 
     @Query("SELECT COALESCE(SUM(t.rateUsed * t.hoursWorked), 0) FROM Task t JOIN t.project p WHERE p.company.id = :companyId AND t.isPaid = :isPaid")
     BigDecimal sumAmountByCompanyIdAndIsPaid(@Param("companyId") Long companyId, @Param("isPaid") boolean isPaid);
+
+    @Query("SELECT COALESCE(SUM(t.rateUsed * t.hoursWorked), 0) " +
+        "FROM Task t JOIN t.project p " +
+        "WHERE p.company.id = :companyId " +
+        "AND t.userEmail = :userEmail " +
+        "AND (t.isPartiallyBilled = false OR t.isPartiallyBilled IS NULL) " +
+        "AND t.isBilled = :isBilled")
+    BigDecimal sumAmountByCompanyIdAndNotPartiallyBilledAndIsBilled(
+        @Param("companyId") Long companyId,
+        @Param("userEmail") String userEmail,
+        @Param("isBilled") boolean isBilled
+    );
+
+    @Query("SELECT COALESCE(SUM(t.rateUsed * t.hoursWorked), 0) " +
+        "FROM Task t JOIN t.project p " +
+        "WHERE p.company.id = :companyId " +
+        "AND t.userEmail = :userEmail " +
+        "AND (t.isPartiallyPaid = false OR t.isPartiallyPaid IS NULL) " +
+        "AND t.isPaid = :isPaid")
+    BigDecimal sumAmountByCompanyIdAndNotPartiallyPaidAndIsPaid(
+        @Param("companyId") Long companyId,
+        @Param("userEmail") String userEmail,
+        @Param("isPaid") boolean isPaid
+    );
 
     @Query("SELECT t FROM Task t JOIN t.project p WHERE t.userEmail = :userEmail AND p.company.id = :companyId AND t.startDate BETWEEN :startDate AND :endDate")
     List<Task> findByUserEmailAndCompanyIdAndDateRange(

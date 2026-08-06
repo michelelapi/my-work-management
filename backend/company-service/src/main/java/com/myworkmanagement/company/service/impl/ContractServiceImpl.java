@@ -9,6 +9,7 @@ import com.myworkmanagement.company.exception.ResourceNotFoundException;
 import com.myworkmanagement.company.repository.CompanyRepository;
 import com.myworkmanagement.company.repository.ContractRepository;
 import com.myworkmanagement.company.repository.ProjectRepository;
+import com.myworkmanagement.company.repository.TaskContractUsageRepository;
 import com.myworkmanagement.company.service.ContractService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -18,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -29,6 +31,7 @@ public class ContractServiceImpl implements ContractService {
     private final ContractRepository contractRepository;
     private final CompanyRepository companyRepository;
     private final ProjectRepository projectRepository;
+    private final TaskContractUsageRepository taskContractUsageRepository;
 
     @Override
     public ContractDTO createContract(Long companyId, ContractDTO dto) {
@@ -65,7 +68,11 @@ public class ContractServiceImpl implements ContractService {
             throw new ResourceNotFoundException("Contract not found with id: " + contractId + " for company: " + companyId);
         }
 
-        if (dto.getCode() != null && !contract.getCode().equals(dto.getCode())) {
+        String previousCode = contract.getCode();
+        String updatedCode = dto.getCode();
+        boolean isCodeChanging = updatedCode != null && !Objects.equals(previousCode, updatedCode);
+
+        if (isCodeChanging) {
             contractRepository.findByCode(dto.getCode()).ifPresent(existing -> {
                 if (!existing.getId().equals(contractId)) {
                     throw new IllegalArgumentException("Contract with code \"" + dto.getCode() + "\" already exists.");
@@ -85,7 +92,12 @@ public class ContractServiceImpl implements ContractService {
             contract.setProjects(resolveProjects(dto.getProjectIds()));
         }
 
-        return mapToDTO(contractRepository.save(contract));
+        Contract savedContract = contractRepository.save(contract);
+        if (isCodeChanging) {
+            taskContractUsageRepository.updateContractCodeByContractId(savedContract.getId(), savedContract.getCode());
+        }
+
+        return mapToDTO(savedContract);
     }
 
     @Override

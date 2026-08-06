@@ -21,8 +21,10 @@ import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.stream.IntStream;
 
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -506,6 +508,8 @@ public class SalPdfService {
         BigDecimal totalHours = BigDecimal.ZERO;
         BigDecimal totalAmount = BigDecimal.ZERO;
         BigDecimal totalAmountWithVat = BigDecimal.ZERO;
+        // Overall per-client totals (across months), shown before the final Totale importo
+        Map<String, BigDecimal[]> overallClientTotals = new LinkedHashMap<>();
 
         long distinctClientCount = groupedTasks.stream().map(this::resolveClientName).distinct().count();
         boolean multipleClients = distinctClientCount > 1;
@@ -708,6 +712,12 @@ public class SalPdfService {
                 totalAmount = totalAmount.add(amount);
                 totalAmountWithVat = totalAmountWithVat.add(amountWithVat);
 
+                BigDecimal[] overallClient = overallClientTotals.computeIfAbsent(clientName,
+                    k -> new BigDecimal[]{BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO});
+                overallClient[0] = overallClient[0].add(billableHours);
+                overallClient[1] = overallClient[1].add(amount);
+                overallClient[2] = overallClient[2].add(amountWithVat);
+
             boolean endOfClientBlock = nextClient == null
                 || !clientName.equals(nextClient)
                 || nextMonthLabel == null
@@ -832,6 +842,35 @@ public class SalPdfService {
         contentStream.newLineAtOffset(col5X, yPosition);
         contentStream.showText(formatItalianNumber(totalAmountWithVat));
         contentStream.endText();
+
+        // Per-client totals (before main Totale importo)
+        if (!overallClientTotals.isEmpty()) {
+            for (Map.Entry<String, BigDecimal[]> entry : overallClientTotals.entrySet()) {
+                String clientLabel = "No Client".equals(entry.getKey())
+                    ? "Senza cliente"
+                    : sanitizeTextForPdf(entry.getKey());
+                BigDecimal[] totals = entry.getValue();
+
+                if (yPosition < 100) {
+                    contentStream.close();
+                    PDPage newPage = new PDPage();
+                    document.addPage(newPage);
+                    contentStream = new PDPageContentStream(document, newPage);
+                    yPosition = pageHeight - margin - 40;
+                }
+
+                yPosition -= 18;
+                contentStream.beginText();
+                contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 10);
+                contentStream.newLineAtOffset(margin, yPosition);
+                contentStream.showText(String.format("Totale %s: %s€ (+IVA %s€) (%s ore)",
+                    clientLabel,
+                    formatItalianNumber(totals[1]),
+                    formatItalianNumber(totals[2]),
+                    formatItalianNumber(totals[0])));
+                contentStream.endText();
+            }
+        }
 
         // Overall total
         yPosition -= 30;

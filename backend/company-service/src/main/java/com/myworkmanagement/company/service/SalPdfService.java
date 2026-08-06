@@ -153,6 +153,38 @@ public class SalPdfService {
     }
 
     /**
+     * Resolves the SAL amount that still needs to be billed for a task.
+     * For partially billed tasks, subtract portions that already have an invoice.
+     */
+    private BigDecimal resolveSalAmount(TaskDTO task) {
+        BigDecimal hours = task.getHoursWorked() != null ? task.getHoursWorked() : BigDecimal.ZERO;
+        BigDecimal rate = task.getRateUsed() != null ? task.getRateUsed() : BigDecimal.ZERO;
+        BigDecimal baseAmount = task.getBillableAmount() != null
+            ? task.getBillableAmount()
+            : hours.multiply(rate);
+
+        if (task.getContractUsages() == null || task.getContractUsages().isEmpty()) {
+            return baseAmount;
+        }
+
+        BigDecimal alreadyBilledAmount = task.getContractUsages().stream()
+            .filter(usage -> Boolean.TRUE.equals(usage.getIsBilled())
+                || (usage.getInvoiceId() != null && !usage.getInvoiceId().isBlank()))
+            .map(usage -> usage.getAmountUsed() != null ? usage.getAmountUsed() : BigDecimal.ZERO)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal remainingToBill = baseAmount.subtract(alreadyBilledAmount);
+        return remainingToBill.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : remainingToBill;
+    }
+
+    private BigDecimal resolveHoursFromAmount(BigDecimal amount, BigDecimal rate) {
+        if (rate.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+        return amount.divide(rate, 2, java.math.RoundingMode.HALF_UP);
+    }
+
+    /**
      * Wraps text to fit within a specified width
      */
     private java.util.List<String> wrapText(String text, float maxWidth, PDType1Font font, float fontSize) throws IOException {
@@ -602,19 +634,19 @@ public class SalPdfService {
                 
                 yPosition -= rowHeight;
 
-                // Hours (aligned to top of row)
+                // Amount: for partially billed tasks show only the not-yet-billed portion in SAL
+                BigDecimal amount = resolveSalAmount(task);
+                // Hours: keep the actual task total hours on the main task row
                 BigDecimal hours = task.getHoursWorked() != null ? task.getHoursWorked() : BigDecimal.ZERO;
+                BigDecimal rate = task.getRateUsed() != null ? task.getRateUsed() : BigDecimal.ZERO;
+                // Hours to bill: used for subtotals/totals
+                BigDecimal billableHours = resolveHoursFromAmount(amount, rate);
                 contentStream.beginText();
                 contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 9);
                 contentStream.newLineAtOffset(col3X, rowStartY);
                 contentStream.showText(formatItalianNumber(hours));
                 contentStream.endText();
 
-                // Amount: use exact billable amount when set (contract budget split), else hours * rate
-                BigDecimal rate = task.getRateUsed() != null ? task.getRateUsed() : BigDecimal.ZERO;
-                BigDecimal amount = task.getBillableAmount() != null
-                    ? task.getBillableAmount()
-                    : hours.multiply(rate);
                 contentStream.beginText();
                 contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 9);
                 contentStream.newLineAtOffset(col4X, rowStartY);
@@ -640,8 +672,21 @@ public class SalPdfService {
                             contentStream = new PDPageContentStream(document, contractPage);
                             yPosition = pageHeight - margin - 40;
                         }
+                        BigDecimal usageAmount = usage.getAmountUsed() != null ? usage.getAmountUsed() : BigDecimal.ZERO;
+                        BigDecimal usageHours = resolveHoursFromAmount(usageAmount, rate);
+                        boolean usageBilled = Boolean.TRUE.equals(usage.getIsBilled())
+                                || (usage.getInvoiceId() != null && !usage.getInvoiceId().isBlank());
+                        String billingSuffix = "";
+                        if (usageBilled) {
+                            String billingDateLabel = usage.getBillingDate() != null
+                                    ? usage.getBillingDate().format(DATE_FORMATTER)
+                                    : "N/D";
+                            billingSuffix = " (Billed " + billingDateLabel + ")";
+                        }
                         String contractInfo = "Contratto: " + sanitizeTextForPdf(usage.getContractCode())
-                                + " - Importo: " + formatItalianNumber(usage.getAmountUsed());
+                                + " - Ore: " + formatItalianNumber(usageHours)
+                                + " - Importo: " + formatItalianNumber(usageAmount)
+                                + billingSuffix;
                         contentStream.beginText();
                         contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_OBLIQUE), 7);
                         contentStream.newLineAtOffset(col2X + 10, yPosition);
@@ -651,15 +696,15 @@ public class SalPdfService {
                 }
 
                 // Add to client / month / overall totals
-                clientHours = clientHours.add(hours);
+                clientHours = clientHours.add(billableHours);
                 clientAmount = clientAmount.add(amount);
                 clientAmountWithVat = clientAmountWithVat.add(amountWithVat);
 
-                monthHours = monthHours.add(hours);
+                monthHours = monthHours.add(billableHours);
                 monthAmount = monthAmount.add(amount);
                 monthAmountWithVat = monthAmountWithVat.add(amountWithVat);
                 
-                totalHours = totalHours.add(hours);
+                totalHours = totalHours.add(billableHours);
                 totalAmount = totalAmount.add(amount);
                 totalAmountWithVat = totalAmountWithVat.add(amountWithVat);
 

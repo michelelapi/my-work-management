@@ -32,6 +32,7 @@ public interface TaskContractUsageRepository extends JpaRepository<TaskContractU
         "JOIN t.project p " +
         "WHERE p.company.id = :companyId " +
         "AND t.userEmail = :userEmail " +
+        "AND t.isPartiallyBilled = true " +
         "AND (u.invoiceId IS NULL OR TRIM(u.invoiceId) = '')")
     BigDecimal sumUnbilledUsageAmountByCompanyIdAndUserEmail(@Param("companyId") Long companyId, @Param("userEmail") String userEmail);
 
@@ -41,6 +42,7 @@ public interface TaskContractUsageRepository extends JpaRepository<TaskContractU
         "JOIN t.project p " +
         "WHERE p.company.id = :companyId " +
         "AND t.userEmail = :userEmail " +
+        "AND t.isPartiallyPaid = true " +
         "AND u.invoiceId IS NOT NULL " +
         "AND TRIM(u.invoiceId) <> '' " +
         "AND u.paymentDate IS NULL")

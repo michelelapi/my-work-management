@@ -494,8 +494,12 @@ public class TaskServiceImpl implements TaskService {
             boolean wasPartiallyBilled = Boolean.TRUE.equals(task.getIsPartiallyBilled());
             boolean nowBilled = Boolean.TRUE.equals(update.getIsBilled());
 
-            if (nowBilled && !wasBilled && !wasPartiallyBilled) {
-                allocateTaskCostToContracts(task);
+            if (nowBilled && !wasBilled) {
+                // Fresh billing allocates contracts; completing a partially billed task
+                // only applies invoice IDs to remaining unbilled portions.
+                if (!wasPartiallyBilled) {
+                    allocateTaskCostToContracts(task);
+                }
                 applyInvoiceIdsToContractUsages(task, update.getInvoiceId(), update.getBillingDate());
             } else if (!nowBilled && (wasBilled || wasPartiallyBilled)) {
                 reverseTaskContractUsages(task);
@@ -584,12 +588,23 @@ public class TaskServiceImpl implements TaskService {
             throw new TaskBillingStatusException("Invoice ID is required when marking a task as billed");
         }
 
-        if (invoiceIds.size() == 1 && usages.size() > 1) {
-            billContractUsage(usages.get(0), invoiceIds.get(0), billingDate);
+        List<TaskContractUsage> unbilledUsages = usages.stream()
+            .filter(usage -> usage.getInvoiceId() == null || usage.getInvoiceId().isBlank())
+            .collect(Collectors.toList());
+
+        if (unbilledUsages.isEmpty()) {
+            syncTaskBillingState(task);
+            return;
+        }
+
+        // Single invoice with multiple remaining portions: bill only the first
+        // (task stays partially billed). Pair invoices to remaining portions otherwise.
+        if (invoiceIds.size() == 1 && unbilledUsages.size() > 1) {
+            billContractUsage(unbilledUsages.get(0), invoiceIds.get(0), billingDate);
         } else {
-            int limit = Math.min(invoiceIds.size(), usages.size());
+            int limit = Math.min(invoiceIds.size(), unbilledUsages.size());
             for (int i = 0; i < limit; i++) {
-                billContractUsage(usages.get(i), invoiceIds.get(i), billingDate);
+                billContractUsage(unbilledUsages.get(i), invoiceIds.get(i), billingDate);
             }
         }
 

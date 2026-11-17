@@ -50,6 +50,7 @@ public class StatisticsServiceImpl implements StatisticsService {
                     return CompanyProjectStatsDTO.builder()
                             .companyId(company.getId())
                             .companyName(company.getName())
+                            .companyStatus(company.getStatus())
                             .projectCount(projectRepository.countByCompanyId(company.getId()))
                             .taskCount(taskCount)
                             .totalHours(totalHours != null ? totalHours.intValue() : 0)

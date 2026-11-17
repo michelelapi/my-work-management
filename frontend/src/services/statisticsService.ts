@@ -3,6 +3,7 @@ import api from './api';
 export interface CompanyProjectStats {
     companyId: number;
     companyName: string;
+    companyStatus: string;
     projectCount: number;
     taskCount: number;
     totalHours: number;

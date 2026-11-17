@@ -1,5 +1,6 @@
 package com.myworkmanagement.company.dto;
 
+import com.myworkmanagement.company.entity.CompanyStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -18,6 +19,9 @@ public class CompanyProjectStatsDTO {
 
     @Schema(description = "Name of the company", example = "Example Corp")
     private String companyName;
+
+    @Schema(description = "Status of the company", example = "ACTIVE")
+    private CompanyStatus companyStatus;
 
     @Schema(description = "Total number of projects in the company", example = "5")
     private Long projectCount;

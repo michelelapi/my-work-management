@@ -58,7 +58,12 @@ const CompanyStats: React.FC = () => {
     const fetchStats = async () => {
       try {
         const data = await statisticsService.getCompanyProjectStats();
-        setStats(data);
+        const sorted = [...data].sort((a, b) => {
+          const aInactive = a.companyStatus === 'INACTIVE' ? 0 : 1;
+          const bInactive = b.companyStatus === 'INACTIVE' ? 0 : 1;
+          return aInactive - bInactive;
+        });
+        setStats(sorted);
       } catch (err) {
         setError('Failed to fetch company statistics');
         console.error('Error fetching company stats:', err);

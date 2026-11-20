@@ -24,6 +24,8 @@ import BillsInfoModal, { BillInfoRow } from '../components/BillsInfoModal';
 import GenerateSalModal from '../components/GenerateSalModal';
 import PartialBillingModal from '../components/PartialBillingModal';
 import PartialPaymentModal from '../components/PartialPaymentModal';
+import CreateTaskModal from '../components/CreateTaskModal';
+import clientService from '../services/clientService';
 import { getBillingStatus } from '../utils/billingStatus';
 import { getPaymentStatus } from '../utils/paymentStatus';
 
@@ -101,6 +103,11 @@ const TaskListPage: React.FC = () => {
     const [salModalTasks, setSalModalTasks] = useState<Task[]>([]);
     const [salModalPeriod, setSalModalPeriod] = useState<{ year: number; month: number } | null>(null);
     const [salGenerating, setSalGenerating] = useState(false);
+
+    // Create task modal (manual vs paste JSON)
+    const [createTaskModalOpen, setCreateTaskModalOpen] = useState(false);
+    const [creatingTaskFromJson, setCreatingTaskFromJson] = useState(false);
+    const [tasksRefreshKey, setTasksRefreshKey] = useState(0);
 
     // Type filter state
     const [typeFilter, setTypeFilter] = useState<string | null>(null);
@@ -527,7 +534,7 @@ const TaskListPage: React.FC = () => {
 
         fetchTasks();
 
-    }, [projectId, projectFilter, currentPage, pageSize, debouncedSearchTerm, typeFilter, statusFilter, sortField, sortDirection, monthFilter, yearFilter, searchParams]);
+    }, [projectId, projectFilter, currentPage, pageSize, debouncedSearchTerm, typeFilter, statusFilter, sortField, sortDirection, monthFilter, yearFilter, searchParams, tasksRefreshKey]);
 
     useEffect(() => {
         if (searchTermRef.current && !loading) {
@@ -1063,7 +1070,81 @@ const TaskListPage: React.FC = () => {
         if (!shouldProceed) {
             return;
         }
-        navigate('/tasks/new');
+        setCreateTaskModalOpen(true);
+    };
+
+    const navigateToNewTask = () => {
+        const selectedProjectId = resolveCreateTaskProjectId();
+        navigate('/tasks/new', {
+            state: {
+                projectId: selectedProjectId
+            }
+        });
+    };
+
+    const generateRandomTaskId = (): string => {
+        const year = new Date().getFullYear();
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let randomPart = '';
+        for (let i = 0; i < 6; i++) {
+            randomPart += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return `TSK-${year}-${randomPart}`;
+    };
+
+    const handleCreateTaskFromJson = async (partialTask: Partial<Task>, clientName?: string) => {
+        const selectedProjectId = resolveCreateTaskProjectId();
+        if (!selectedProjectId) {
+            throw new Error('Select a project in the filter before creating a task from JSON.');
+        }
+
+        const project = projects.find(p => p.id === selectedProjectId);
+        let clientId = project?.defaultClientId;
+        if (clientName) {
+            const clients = await clientService.getAllClientsByProjectId(selectedProjectId);
+            const match = clients.find(
+                c => c.name.trim().toLowerCase() === clientName.trim().toLowerCase()
+            );
+            if (match?.id) {
+                clientId = match.id;
+            } else {
+                throw new Error(`Client "${clientName}" was not found for the selected project.`);
+            }
+        }
+
+        const ticketId = partialTask.ticketId?.trim()
+            ? partialTask.ticketId.trim()
+            : generateRandomTaskId();
+
+        const taskToCreate: Task = {
+            title: partialTask.title || '',
+            description: partialTask.description,
+            ticketId,
+            referencedTaskId: partialTask.referencedTaskId,
+            startDate: partialTask.startDate || new Date().toISOString().split('T')[0],
+            endDate: partialTask.endDate,
+            hoursWorked: partialTask.hoursWorked || 0,
+            rateUsed: partialTask.rateUsed ?? project?.hourlyRate,
+            type: partialTask.type || 'CORRETTIVA',
+            currency: partialTask.currency || 'EUR',
+            isBilled: partialTask.isBilled ?? false,
+            isPaid: partialTask.isPaid ?? false,
+            notes: partialTask.notes,
+            projectId: selectedProjectId,
+            clientId,
+            clientName
+        };
+
+        setCreatingTaskFromJson(true);
+        try {
+            await taskService.createTask(selectedProjectId, taskToCreate);
+            setTasksRefreshKey(prev => prev + 1);
+        } catch (err) {
+            console.error('Error creating task from JSON:', err);
+            throw new Error('Failed to create task. Please try again.');
+        } finally {
+            setCreatingTaskFromJson(false);
+        }
     };
 
     const resolveSalPeriod = (): { year: number; month: number } | null => {
@@ -1403,6 +1484,25 @@ const TaskListPage: React.FC = () => {
                     </button>
                 </div>
             </div>
+
+            <CreateTaskModal
+                isOpen={createTaskModalOpen}
+                creating={creatingTaskFromJson}
+                projectName={
+                    (() => {
+                        const selectedProjectId = resolveCreateTaskProjectId();
+                        return selectedProjectId
+                            ? projects.find(p => p.id === selectedProjectId)?.name
+                            : undefined;
+                    })()
+                }
+                onClose={() => setCreateTaskModalOpen(false)}
+                onManual={() => {
+                    setCreateTaskModalOpen(false);
+                    navigateToNewTask();
+                }}
+                onConfirmCreate={handleCreateTaskFromJson}
+            />
 
             {/* Billing Status Update Modal */}
             <BillingStatusModal

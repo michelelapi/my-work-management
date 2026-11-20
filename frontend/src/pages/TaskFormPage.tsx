@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Task } from '../types/task';
 import { Project } from '../types/project';
 import { Client } from '../types/client';
 import { taskService } from '../services/taskService';
 import projectService from '../services/projectService';
 import clientService from '../services/clientService';
+
+interface TaskFormLocationState {
+    projectId?: number;
+}
 
 interface ValidationErrors {
     projectId?: string;
@@ -21,6 +25,8 @@ interface ValidationErrors {
 const TaskFormPage: React.FC = () => {
     const { projectId: urlProjectId, taskId } = useParams<{ projectId: string; taskId: string }>();
     const navigate = useNavigate();
+    const location = useLocation();
+    const locationState = (location.state || {}) as TaskFormLocationState;
     const [task, setTask] = useState<Task>({
         title: '',
         description: '',
@@ -62,28 +68,32 @@ const TaskFormPage: React.FC = () => {
                         const fetchedClients = await clientService.getAllClientsByProjectId(fetchedTask.projectId);
                         setClients(fetchedClients);
                     }
-                } else if (urlProjectId) {
-                    const projectIdNum = parseInt(urlProjectId);
-                    const foundProject = fetchedProjects.find(p => p.id === projectIdNum);
-                    setTask(prev => ({
-                        ...prev,
-                        projectId: projectIdNum,
-                        rateUsed: foundProject?.hourlyRate,
-                        clientId: foundProject?.defaultClientId
-                    }));
-                    // Fetch clients for the project
-                    const fetchedClients = await clientService.getAllClientsByProjectId(projectIdNum);
-                    setClients(fetchedClients);
                 } else {
-                    const activeProjects = fetchedProjects.filter(project => project.status === 'ACTIVE');
-                    if (activeProjects.length === 1) {
-                        const onlyProject = activeProjects[0];
+                    const projectIdNum = urlProjectId
+                        ? parseInt(urlProjectId)
+                        : locationState.projectId;
+
+                    if (projectIdNum) {
+                        const foundProject = fetchedProjects.find(p => p.id === projectIdNum);
                         setTask(prev => ({
                             ...prev,
-                            projectId: onlyProject.id,
-                            rateUsed: onlyProject.hourlyRate,
-                            clientId: onlyProject.defaultClientId
+                            projectId: projectIdNum,
+                            rateUsed: foundProject?.hourlyRate,
+                            clientId: foundProject?.defaultClientId
                         }));
+                        const fetchedClients = await clientService.getAllClientsByProjectId(projectIdNum);
+                        setClients(fetchedClients);
+                    } else {
+                        const activeProjects = fetchedProjects.filter(project => project.status === 'ACTIVE');
+                        if (activeProjects.length === 1) {
+                            const onlyProject = activeProjects[0];
+                            setTask(prev => ({
+                                ...prev,
+                                projectId: onlyProject.id,
+                                rateUsed: onlyProject.hourlyRate,
+                                clientId: onlyProject.defaultClientId
+                            }));
+                        }
                     }
                 }
             } catch (err) {
@@ -95,6 +105,7 @@ const TaskFormPage: React.FC = () => {
         };
 
         fetchData();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isEditMode, urlProjectId, taskId]);
 
     // Fetch clients when project changes

@@ -37,7 +37,7 @@ const InfoForBillModal: React.FC<InfoForBillModalProps> = ({
             <div className="relative p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white dark:bg-gray-800 max-h-[90vh] overflow-y-auto">
                 <div className="mt-3">
                     <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white mt-2 mb-4 text-center">
-                        Info For Bill
+                        Info To Bill
                     </h3>
                     
                     {/* Tasks grouped by day */}

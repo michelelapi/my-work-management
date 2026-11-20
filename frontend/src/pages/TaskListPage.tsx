@@ -20,6 +20,7 @@ import TaskActionButtons from '../components/TaskActionButtons';
 import BillingStatusModal from '../components/BillingStatusModal';
 import PaymentStatusModal from '../components/PaymentStatusModal';
 import InfoForBillModal from '../components/InfoForBillModal';
+import BillsInfoModal, { BillInfoRow } from '../components/BillsInfoModal';
 import GenerateSalModal from '../components/GenerateSalModal';
 import PartialBillingModal from '../components/PartialBillingModal';
 import PartialPaymentModal from '../components/PartialPaymentModal';
@@ -88,6 +89,12 @@ const TaskListPage: React.FC = () => {
     // Info For Bill modal state
     const [infoForBillModalOpen, setInfoForBillModalOpen] = useState(false);
     const [copiedField, setCopiedField] = useState<string | null>(null);
+
+    // Bills Info modal state
+    const [billsInfoModalOpen, setBillsInfoModalOpen] = useState(false);
+    const [billsInfoRows, setBillsInfoRows] = useState<BillInfoRow[]>([]);
+    const [billsInfoLoading, setBillsInfoLoading] = useState(false);
+    const [billsInfoProjectName, setBillsInfoProjectName] = useState<string | undefined>(undefined);
 
     // Generate SAL modal state
     const [salModalOpen, setSalModalOpen] = useState(false);
@@ -953,6 +960,103 @@ const TaskListPage: React.FC = () => {
         });
     };
 
+    const resolveCreateTaskProjectId = (): number | undefined => {
+        if (projectFilter !== null && projectFilter !== undefined) {
+            return projectFilter;
+        }
+        if (projectId) {
+            const parsed = parseInt(projectId, 10);
+            return isNaN(parsed) ? undefined : parsed;
+        }
+        const urlProjectId = searchParams.get('projectId');
+        if (urlProjectId) {
+            const parsed = parseInt(urlProjectId, 10);
+            return isNaN(parsed) ? undefined : parsed;
+        }
+        return undefined;
+    };
+
+    const extractBillsFromTasks = (sourceTasks: Task[]): BillInfoRow[] => {
+        const billsByInvoice = new Map<string, BillInfoRow>();
+
+        const addBill = (invoiceId: string, billingDate?: string, paymentDate?: string) => {
+            const trimmedId = invoiceId.trim();
+            if (!trimmedId || billsByInvoice.has(trimmedId)) {
+                return;
+            }
+            billsByInvoice.set(trimmedId, {
+                invoiceId: trimmedId,
+                billingDate: billingDate ? billingDate.split('T')[0] : undefined,
+                paymentDate: paymentDate ? paymentDate.split('T')[0] : undefined
+            });
+        };
+
+        for (const task of sourceTasks) {
+            const billedUsages = task.contractUsages?.filter(
+                usage => usage.invoiceId && usage.invoiceId.trim() !== ''
+            );
+
+            if (billedUsages && billedUsages.length > 0) {
+                for (const usage of billedUsages) {
+                    addBill(usage.invoiceId!, usage.billingDate, usage.paymentDate);
+                }
+            } else if (task.invoiceId && task.invoiceId.trim() !== '') {
+                const invoiceIds = task.invoiceId.split(',').map(id => id.trim()).filter(Boolean);
+                for (const invoiceId of invoiceIds) {
+                    addBill(invoiceId, task.billingDate, task.paymentDate);
+                }
+            }
+        }
+
+        return Array.from(billsByInvoice.values()).sort((a, b) =>
+            (b.billingDate || '').localeCompare(a.billingDate || '')
+        );
+    };
+
+    const handleBillsInfoClick = async () => {
+        const selectedProjectId = resolveCreateTaskProjectId();
+        if (!selectedProjectId) {
+            window.alert('Select a project from the project list first.');
+            return;
+        }
+
+        const project = projects.find(p => p.id === selectedProjectId);
+        setBillsInfoProjectName(project?.name);
+        setBillsInfoModalOpen(true);
+        setBillsInfoLoading(true);
+        setBillsInfoRows([]);
+
+        try {
+            let allProjectTasks: Task[] = [];
+            let page = 0;
+            let hasMore = true;
+
+            while (hasMore) {
+                const pageResponse = await taskService.getTasks(
+                    selectedProjectId,
+                    page,
+                    1000,
+                    undefined,
+                    undefined,
+                    undefined,
+                    'startDate,desc'
+                );
+                allProjectTasks = allProjectTasks.concat(pageResponse.content);
+                hasMore = page < pageResponse.totalPages - 1;
+                page++;
+                if (page > 1000) break;
+            }
+
+            setBillsInfoRows(extractBillsFromTasks(allProjectTasks));
+        } catch (err) {
+            console.error('Error loading bills info:', err);
+            setError('Failed to load bills info. Please try again.');
+            setBillsInfoModalOpen(false);
+        } finally {
+            setBillsInfoLoading(false);
+        }
+    };
+
     const handleCreateNewTask = async () => {
         const createTaskPath = projectId ? `/projects/${projectId}/tasks` : '/projects/1/tasks';
         const shouldProceed = await runReminderPreflightGate('POST', createTaskPath);
@@ -1274,6 +1378,7 @@ const TaskListPage: React.FC = () => {
                             }
                             setInfoForBillModalOpen(true);
                         }}
+                        onBillsInfoClick={handleBillsInfoClick}
                         onGenerateSalClick={handleGenerateSal}
                         hasBillingStatusReminder={activeReminderActivities.has('Update Billing Status')}
                         hasPaymentStatusReminder={activeReminderActivities.has('Update Payment Status')}
@@ -1355,6 +1460,15 @@ const TaskListPage: React.FC = () => {
                 copiedField={copiedField}
                 onCopy={handleCopy}
                 onClose={() => setInfoForBillModalOpen(false)}
+            />
+
+            {/* Bills Info Modal */}
+            <BillsInfoModal
+                isOpen={billsInfoModalOpen}
+                projectName={billsInfoProjectName}
+                bills={billsInfoRows}
+                loading={billsInfoLoading}
+                onClose={() => !billsInfoLoading && setBillsInfoModalOpen(false)}
             />
 
             {/* Generate SAL Modal */}

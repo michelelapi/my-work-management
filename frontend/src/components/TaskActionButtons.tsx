@@ -7,6 +7,7 @@ interface TaskActionButtonsProps {
     onBillingStatusClick: () => void;
     onPaymentStatusClick: () => void;
     onInfoForBillClick: () => void;
+    onBillsInfoClick: () => void;
     onGenerateSalClick: () => void;
     hasBillingStatusReminder?: boolean;
     hasPaymentStatusReminder?: boolean;
@@ -18,6 +19,7 @@ const TaskActionButtons: React.FC<TaskActionButtonsProps> = ({
     onBillingStatusClick,
     onPaymentStatusClick,
     onInfoForBillClick,
+    onBillsInfoClick,
     onGenerateSalClick,
     hasBillingStatusReminder = false,
     hasPaymentStatusReminder = false,
@@ -56,7 +58,13 @@ const TaskActionButtons: React.FC<TaskActionButtonsProps> = ({
                 className="relative bg-yellow-500 hover:bg-yellow-600 text-black px-4 py-2 rounded-md transition-colors text-sm"
             >
                 {hasInfoForBillReminder && <ReminderBell />}
-                Info For Bill
+                Info To Bill
+            </button>
+            <button
+                onClick={onBillsInfoClick}
+                className="relative bg-orange-500 hover:bg-orange-600 text-black px-4 py-2 rounded-md transition-colors text-sm"
+            >
+                Bills Info
             </button>
             <button
                 onClick={onGenerateSalClick}

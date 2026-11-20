@@ -25,9 +25,17 @@ const formatDate = (value?: string): string => {
 };
 
 const formatAvailableAmount = (value: number): string => {
-    return value.toLocaleString('it-IT', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
+    if (Math.abs(value) >= 1000) {
+        const thousands = value / 1000;
+        const formatted = thousands.toLocaleString('en-US', {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 1
+        });
+        return `${formatted}k`;
+    }
+    return value.toLocaleString('en-US', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 1
     });
 };
 
@@ -49,28 +57,26 @@ const ContractAmountBlock: React.FC<{ availability?: ContractAvailability }> = (
     const barColor = usedPercent > 90 ? 'bg-red-500' : usedPercent > 70 ? 'bg-yellow-500' : 'bg-green-500';
 
     return (
-        <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 mb-1 items-center">
-            <span className="row-start-2 text-gray-600 dark:text-gray-400 shrink-0 self-center">
+        <div className="flex justify-between items-center gap-3 mb-1">
+            <span className="text-gray-600 dark:text-gray-400 shrink-0">
                 Contract amount:
             </span>
-            <div className="row-start-1 col-start-2 relative h-4">
-                <div
-                    className="absolute top-0 -translate-x-1/2 text-xs font-medium text-gray-900 dark:text-white whitespace-nowrap"
-                    style={{ left: `${availablePercent}%` }}
-                >
-                    {formatAvailableAmount(availability.amountAvailable)}
-                </div>
-            </div>
-            <div className="row-start-2 col-start-2 relative w-full bg-gray-200 dark:bg-gray-600 rounded-full h-5 overflow-hidden">
+            <div className="relative flex-1 min-w-0 w-full bg-gray-200 dark:bg-gray-600 rounded-full h-5 overflow-hidden">
                 <div
                     className={`absolute inset-y-0 left-0 rounded-full ${barColor}`}
                     style={{ width: `${availablePercent}%` }}
                 />
-                <div className="absolute inset-0 flex items-center justify-between px-2 text-[11px] font-bold">
+                <div className="absolute inset-0 flex items-center justify-between px-2 text-[11px] font-bold pointer-events-none">
                     <span className="text-gray-900">0</span>
                     <span className="text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.9)]">
                         {formatAvailableAmount(availability.totalAmount)}
                     </span>
+                </div>
+                <div
+                    className="absolute inset-y-0 flex items-center pl-1 text-[11px] font-bold text-amber-300 pointer-events-none whitespace-nowrap"
+                    style={{ left: `${availablePercent}%` }}
+                >
+                    {formatAvailableAmount(availability.amountAvailable)}
                 </div>
             </div>
         </div>

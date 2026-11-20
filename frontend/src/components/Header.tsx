@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import noteService from '../services/noteService';
+import Tooltip from './Tooltip';
 
 const Header: React.FC = () => {
   const { user, logout } = useAuth();
@@ -174,111 +175,140 @@ const Header: React.FC = () => {
             <ul className="flex space-x-4 items-center">
               {shouldShowBackButton && previousPageName && (
                 <li>
-                  <button
-                    onClick={handleGoBack}
-                    className="bg-yellow-400 hover:bg-yellow-500 text-black rounded-md px-3 py-1.5 transition-colors focus:outline-none flex items-center gap-1.5 font-medium"
-                    title={`Go back to previous page`}
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
+                  <Tooltip content={`Go back to ${previousPageName}`} position="bottom">
+                    <button
+                      onClick={handleGoBack}
+                      className="bg-yellow-400 hover:bg-yellow-500 text-black rounded-md px-3 py-1.5 transition-colors focus:outline-none flex items-center gap-1.5 font-medium"
                     >
-                      <path
-                        fillRule="evenodd"
-                        d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                    <span>Back</span>
-                  </button>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-5 w-5"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      <span>Back</span>
+                    </button>
+                  </Tooltip>
                 </li>
               )}
               <li>
-                <Link to="/dashboard" className={getLinkClasses('/dashboard')}>Dashboard</Link>
+                <Tooltip content="Overview and statistics" position="bottom">
+                  <Link to="/dashboard" className={getLinkClasses('/dashboard')}>Dashboard</Link>
+                </Tooltip>
               </li>
               {user ? (
                 <>
                   <li>
-                    <Link to="/notes" className={`${getLinkClasses('/notes')} relative inline-flex`}>
-                      Notes
-                      {unreadNotesCount > 0 && (
-                        <span className="absolute -top-2 -right-3 min-w-[1.2rem] h-5 px-1 text-xs rounded-full bg-red-600 text-white flex items-center justify-center">
-                          {unreadNotesCount}
-                        </span>
-                      )}
-                    </Link>
+                    <Tooltip content="Personal notes" position="bottom">
+                      <Link to="/notes" className={`${getLinkClasses('/notes')} relative inline-flex`}>
+                        Notes
+                        {unreadNotesCount > 0 && (
+                          <span className="absolute -top-2 -right-3 min-w-[1.2rem] h-5 px-1 text-xs rounded-full bg-red-600 text-white flex items-center justify-center">
+                            {unreadNotesCount}
+                          </span>
+                        )}
+                      </Link>
+                    </Tooltip>
                   </li>
                   <li>
-                    <Link to="/reminders" className={getLinkClasses('/reminders')}>Reminders</Link>
+                    <Tooltip content="Activity reminders" position="bottom">
+                      <Link to="/reminders" className={getLinkClasses('/reminders')}>Reminders</Link>
+                    </Tooltip>
                   </li>
                   <li>
-                    <Link to="/db-backups" className={getLinkClasses('/db-backups')}>DB Backups</Link>
+                    <Tooltip content="Database backup management" position="bottom">
+                      <Link to="/db-backups" className={getLinkClasses('/db-backups')}>DB Backups</Link>
+                    </Tooltip>
                   </li>
                   <li>
-                    <Link to="/companies" className={getLinkClasses('/companies')}>Company</Link>
+                    <Tooltip content="Manage companies" position="bottom">
+                      <Link to="/companies" className={getLinkClasses('/companies')}>Company</Link>
+                    </Tooltip>
                   </li>
                   <li>
-                    <Link to="/projects" className={getLinkClasses('/projects')}>Projects</Link>
+                    <Tooltip content="Manage projects" position="bottom">
+                      <Link to="/projects" className={getLinkClasses('/projects')}>Projects</Link>
+                    </Tooltip>
                   </li>
                   <li>
-                    <Link to="/contracts" className={getLinkClasses('/contracts')}>Contracts</Link>
+                    <Tooltip content="Manage contracts" position="bottom">
+                      <Link to="/contracts" className={getLinkClasses('/contracts')}>Contracts</Link>
+                    </Tooltip>
                   </li>
                   <li>
-                    <Link to="/tasks" className={getLinkClasses('/tasks')}>Tasks</Link>
+                    <Tooltip content="Manage tasks and billing" position="bottom">
+                      <Link to="/tasks" className={getLinkClasses('/tasks')}>Tasks</Link>
+                    </Tooltip>
                   </li>
                   <li>
-                    <Link to="/ai-agent" className={getLinkClasses('/ai-agent')}>AI Agent</Link>
+                    <Tooltip content="AI assistant" position="bottom">
+                      <Link to="/ai-agent" className={getLinkClasses('/ai-agent')}>AI Agent</Link>
+                    </Tooltip>
                   </li>
                   <li>
-                    <button onClick={logout} className="hover:text-gray-300 focus:outline-none">
-                      Logout
-                    </button>
+                    <Tooltip content="Sign out of your account" position="bottom">
+                      <button onClick={logout} className="hover:text-gray-300 focus:outline-none">
+                        Logout
+                      </button>
+                    </Tooltip>
                   </li>
                   <li>
-                    <button 
-                      onClick={toggleTheme} 
-                      className="hover:text-gray-300 focus:outline-none transition-colors p-1"
-                      title={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+                    <Tooltip
+                      content={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+                      position="bottom"
                     >
-                      {theme === 'light' ? (
-                        // Light bulb ON (filled/yellow for light mode)
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-6 w-6 text-yellow-400"
-                          viewBox="0 0 20 20"
-                          fill="currentColor"
-                        >
-                          <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.477.859h4z" />
-                        </svg>
-                      ) : (
-                        // Light bulb OFF (outline for dark mode)
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-6 w-6 text-gray-300"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-                          />
-                        </svg>
-                      )}
-                    </button>
+                      <button 
+                        onClick={toggleTheme} 
+                        className="hover:text-gray-300 focus:outline-none transition-colors p-1"
+                      >
+                        {theme === 'light' ? (
+                          // Light bulb ON (filled/yellow for light mode)
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-6 w-6 text-yellow-400"
+                            viewBox="0 0 20 20"
+                            fill="currentColor"
+                          >
+                            <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.477.859h4z" />
+                          </svg>
+                        ) : (
+                          // Light bulb OFF (outline for dark mode)
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-6 w-6 text-gray-300"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                            />
+                          </svg>
+                        )}
+                      </button>
+                    </Tooltip>
                   </li>
                 </>
               ) : (
                 <>
                   <li>
-                    <Link to="/login" className="hover:text-gray-300">Login</Link>
+                    <Tooltip content="Sign in to your account" position="bottom">
+                      <Link to="/login" className="hover:text-gray-300">Login</Link>
+                    </Tooltip>
                   </li>
                   <li>
-                    <Link to="/register" className="hover:text-gray-300">Register</Link>
+                    <Tooltip content="Create a new account" position="bottom">
+                      <Link to="/register" className="hover:text-gray-300">Register</Link>
+                    </Tooltip>
                   </li>
                 </>
               )}

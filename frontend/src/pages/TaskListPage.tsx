@@ -25,6 +25,7 @@ import GenerateSalModal from '../components/GenerateSalModal';
 import PartialBillingModal from '../components/PartialBillingModal';
 import PartialPaymentModal from '../components/PartialPaymentModal';
 import CreateTaskModal from '../components/CreateTaskModal';
+import Tooltip from '../components/Tooltip';
 import clientService from '../services/clientService';
 import { getBillingStatus } from '../utils/billingStatus';
 import { getPaymentStatus } from '../utils/paymentStatus';
@@ -1468,20 +1469,21 @@ const TaskListPage: React.FC = () => {
                     />
 
                     {/* Add New Task Button - Right Side */}
-                    <button
-                        onClick={handleCreateNewTask}
-                        className="relative bg-blue-500 hover:bg-blue-600 text-white px-6 py-2.5 rounded-md transition-colors font-medium shadow-md hover:shadow-lg flex items-center"
-                    >
-                        {activeReminderActivities.has('Create New Task') && (
-                            <span
-                                className="absolute -top-1 -right-1 bg-red-500 rounded-full p-1 shadow-sm"
-                                title="Active reminder"
-                            >
-                                <FaBell className="text-white text-[10px]" />
-                            </span>
-                        )}
-                        Create New Task
-                    </button>
+                    <Tooltip content="Create a task manually or from JSON">
+                        <button
+                            onClick={handleCreateNewTask}
+                            className="relative bg-blue-500 hover:bg-blue-600 text-white px-6 py-2.5 rounded-md transition-colors font-medium shadow-md hover:shadow-lg flex items-center"
+                        >
+                            {activeReminderActivities.has('Create New Task') && (
+                                <Tooltip content="Active reminder" className="absolute -top-1 -right-1 z-10 inline-flex">
+                                    <span className="bg-red-500 rounded-full p-1 shadow-sm flex">
+                                        <FaBell className="text-white text-[10px]" />
+                                    </span>
+                                </Tooltip>
+                            )}
+                            Create New Task
+                        </button>
+                    </Tooltip>
                 </div>
             </div>
 
@@ -1675,12 +1677,11 @@ const TaskListPage: React.FC = () => {
                                         <div className="text-sm font-medium text-gray-900 dark:text-white">{task.ticketId}</div>
                                     </td>
                                     <td className="px-6 py-4 w-3/12 max-w-0">
-                                        <div 
-                                            className="text-sm text-gray-900 dark:text-white truncate"
-                                            title={task.title}
-                                        >
-                                            {task.title}
-                                        </div>
+                                        <Tooltip content={task.title || ''} className="w-full min-w-0 block" multiline>
+                                            <div className="text-sm text-gray-900 dark:text-white truncate w-full">
+                                                {task.title}
+                                            </div>
+                                        </Tooltip>
                                     </td>
                                     <td className="px-6 py-4 break-words w-2/12">
                                         <div className="text-sm text-gray-900 dark:text-white">{task.projectName}</div>
@@ -1703,73 +1704,88 @@ const TaskListPage: React.FC = () => {
                                     <td className="px-3 py-4 break-words w-2/12">
                                         <div className="flex flex-col gap-1.5 min-w-[7.5rem]">
                                             <div className="grid grid-cols-2 gap-1 items-start">
-                                                <span 
-                                                    onClick={() => handleToggleBillingStatus(task)}
-                                                    className={`px-1.5 py-0.5 flex text-center justify-center text-xs font-semibold cursor-pointer hover:opacity-80 transition-opacity ${
+                                                <Tooltip
+                                                    content={
                                                         getBillingStatus(task) === 'partially_billed'
-                                                            ? 'w-full leading-tight whitespace-normal rounded-md'
-                                                            : 'whitespace-nowrap rounded-full'
-                                                    } ${
-                                                        getBillingStatus(task) === 'billed'
-                                                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                                            ? 'Bill remaining portion'
+                                                            : 'Toggle billing status'
+                                                    }
+                                                    position="bottom"
+                                                    className="w-full inline-flex"
+                                                >
+                                                    <span 
+                                                        onClick={() => handleToggleBillingStatus(task)}
+                                                        className={`px-1.5 py-0.5 flex text-center justify-center text-xs font-semibold cursor-pointer hover:opacity-80 transition-opacity ${
+                                                            getBillingStatus(task) === 'partially_billed'
+                                                                ? 'w-full leading-tight whitespace-normal rounded-md'
+                                                                : 'whitespace-nowrap rounded-full'
+                                                        } ${
+                                                            getBillingStatus(task) === 'billed'
+                                                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                                                : getBillingStatus(task) === 'partially_billed'
+                                                                ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
+                                                                : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                                                        }`}
+                                                    >
+                                                        {getBillingStatus(task) === 'billed'
+                                                            ? 'Billed'
                                                             : getBillingStatus(task) === 'partially_billed'
-                                                            ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
-                                                            : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                                                    }`}
-                                                    title={
-                                                        getBillingStatus(task) === 'partially_billed'
-                                                            ? 'Click to bill the remaining portion'
-                                                            : 'Click to toggle billing status'
-                                                    }
-                                                >
-                                                    {getBillingStatus(task) === 'billed'
-                                                        ? 'Billed'
-                                                        : getBillingStatus(task) === 'partially_billed'
-                                                        ? 'Partially Billed'
-                                                        : 'Unbilled'}
-                                                </span>
-                                                <span 
-                                                    onClick={() => handleTogglePaymentStatus(task)}
-                                                    className={`px-1.5 py-0.5 flex text-center justify-center text-xs font-semibold cursor-pointer hover:opacity-80 transition-opacity ${
+                                                            ? 'Partially Billed'
+                                                            : 'Unbilled'}
+                                                    </span>
+                                                </Tooltip>
+                                                <Tooltip
+                                                    content={
                                                         getPaymentStatus(task) === 'partially_paid'
-                                                            ? 'w-full leading-tight whitespace-normal rounded-md'
-                                                            : 'whitespace-nowrap rounded-full'
-                                                    } ${
-                                                        getPaymentStatus(task) === 'paid'
-                                                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                                            ? 'Pay remaining portion'
+                                                            : 'Toggle payment status'
+                                                    }
+                                                    position="bottom"
+                                                    className="w-full inline-flex"
+                                                >
+                                                    <span 
+                                                        onClick={() => handleTogglePaymentStatus(task)}
+                                                        className={`px-1.5 py-0.5 flex text-center justify-center text-xs font-semibold cursor-pointer hover:opacity-80 transition-opacity ${
+                                                            getPaymentStatus(task) === 'partially_paid'
+                                                                ? 'w-full leading-tight whitespace-normal rounded-md'
+                                                                : 'whitespace-nowrap rounded-full'
+                                                        } ${
+                                                            getPaymentStatus(task) === 'paid'
+                                                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                                                : getPaymentStatus(task) === 'partially_paid'
+                                                                ? 'bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-200'
+                                                                : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                                                        }`}
+                                                    >
+                                                        {getPaymentStatus(task) === 'paid'
+                                                            ? 'Paid'
                                                             : getPaymentStatus(task) === 'partially_paid'
-                                                            ? 'bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-200'
-                                                            : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                                                    }`}
-                                                    title={
-                                                        getPaymentStatus(task) === 'partially_paid'
-                                                            ? 'Click to pay the remaining portion'
-                                                            : 'Click to toggle payment status'
-                                                    }
-                                                >
-                                                    {getPaymentStatus(task) === 'paid'
-                                                        ? 'Paid'
-                                                        : getPaymentStatus(task) === 'partially_paid'
-                                                        ? 'Partially Paid'
-                                                        : 'Unpaid'}
-                                                </span>
+                                                            ? 'Partially Paid'
+                                                            : 'Unpaid'}
+                                                    </span>
+                                                </Tooltip>
                                             </div>
                                             {(task.isBilled || task.isPartiallyBilled || task.isPaid || task.isPartiallyPaid) && task.contractUsages && task.contractUsages.length > 0 && task.id !== undefined && (
                                                 <>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => toggleStatusDetails(task.id!)}
-                                                        className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors w-fit"
-                                                        aria-expanded={expandedStatusTaskIds.has(task.id)}
-                                                        aria-label={expandedStatusTaskIds.has(task.id) ? 'Hide billing details' : 'Show billing details'}
+                                                    <Tooltip
+                                                        content={expandedStatusTaskIds.has(task.id) ? 'Hide contract details' : 'Show contract details'}
+                                                        position="bottom"
                                                     >
-                                                        {expandedStatusTaskIds.has(task.id)
-                                                            ? <FaChevronUp size={10} className="shrink-0" />
-                                                            : <FaChevronDown size={10} className="shrink-0" />}
-                                                        <span>
-                                                            {task.contractUsages.length} contract{task.contractUsages.length > 1 ? 's' : ''}
-                                                        </span>
-                                                    </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => toggleStatusDetails(task.id!)}
+                                                            className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors w-fit"
+                                                            aria-expanded={expandedStatusTaskIds.has(task.id)}
+                                                            aria-label={expandedStatusTaskIds.has(task.id) ? 'Hide billing details' : 'Show billing details'}
+                                                        >
+                                                            {expandedStatusTaskIds.has(task.id)
+                                                                ? <FaChevronUp size={10} className="shrink-0" />
+                                                                : <FaChevronDown size={10} className="shrink-0" />}
+                                                            <span>
+                                                                {task.contractUsages.length} contract{task.contractUsages.length > 1 ? 's' : ''}
+                                                            </span>
+                                                        </button>
+                                                    </Tooltip>
                                                     {expandedStatusTaskIds.has(task.id) && (
                                                         <div className="rounded-md border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/50 p-2 space-y-1.5">
                                                             {task.contractUsages.map((cu, idx) => (
@@ -1814,24 +1830,26 @@ const TaskListPage: React.FC = () => {
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 text-right text-sm font-medium break-words w-1/12">
-                                        <button
-                                            onClick={() => {
-                                                if (task.projectId) {
-                                                    navigate(`/companies/${task.projectId}/projects/${task.projectId}/tasks/${task.id}/edit`);
-                                                }
-                                            }}
-                                            className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-4"
-                                            title="Edit"
-                                        >
-                                            <FaPen size={16} className="inline-block" />
-                                        </button>
-                                        <button
-                                            onClick={() => openDeleteModal(task)}
-                                            className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                                            title="Delete"
-                                        >
-                                            <FaTrash size={16} className="inline-block" />
-                                        </button>
+                                        <Tooltip content="Edit task" position="bottom">
+                                            <button
+                                                onClick={() => {
+                                                    if (task.projectId) {
+                                                        navigate(`/companies/${task.projectId}/projects/${task.projectId}/tasks/${task.id}/edit`);
+                                                    }
+                                                }}
+                                                className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-4"
+                                            >
+                                                <FaPen size={16} className="inline-block" />
+                                            </button>
+                                        </Tooltip>
+                                        <Tooltip content="Delete task" position="bottom">
+                                            <button
+                                                onClick={() => openDeleteModal(task)}
+                                                className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                                            >
+                                                <FaTrash size={16} className="inline-block" />
+                                            </button>
+                                        </Tooltip>
                                     </td>
                                 </tr>
                             ))}
@@ -1843,23 +1861,27 @@ const TaskListPage: React.FC = () => {
             {/* Pagination Controls */}
             {totalPages > 1 && (
                 <div className="flex justify-center items-center space-x-4 mt-4">
-                    <button
-                        onClick={() => handlePageChange(currentPage - 1)}
-                        disabled={currentPage === 0}
-                        className="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md shadow-sm hover:bg-gray-300 disabled:opacity-50 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-                    >
-                        Previous
-                    </button>
+                    <Tooltip content="Go to previous page">
+                        <button
+                            onClick={() => handlePageChange(currentPage - 1)}
+                            disabled={currentPage === 0}
+                            className="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md shadow-sm hover:bg-gray-300 disabled:opacity-50 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                        >
+                            Previous
+                        </button>
+                    </Tooltip>
                     <span className="text-gray-700 dark:text-gray-300">
                         Page {currentPage + 1} of {totalPages}
                     </span>
-                    <button
-                        onClick={() => handlePageChange(currentPage + 1)}
-                        disabled={currentPage === totalPages - 1}
-                        className="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md shadow-sm hover:bg-gray-300 disabled:opacity-50 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-                    >
-                        Next
-                    </button>
+                    <Tooltip content="Go to next page">
+                        <button
+                            onClick={() => handlePageChange(currentPage + 1)}
+                            disabled={currentPage === totalPages - 1}
+                            className="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md shadow-sm hover:bg-gray-300 disabled:opacity-50 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                        >
+                            Next
+                        </button>
+                    </Tooltip>
                 </div>
             )}
         </div>

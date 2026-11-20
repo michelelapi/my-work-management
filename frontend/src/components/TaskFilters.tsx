@@ -1,6 +1,7 @@
 import React, { RefObject, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Project, ProjectStatus } from '../types/project';
+import Tooltip from './Tooltip';
 
 const ProjectStatusBadge: React.FC<{ status: ProjectStatus }> = ({ status }) => {
     if (status === ProjectStatus.ACTIVE) {
@@ -154,6 +155,7 @@ const TaskFilters: React.FC<TaskFiltersProps> = ({
                 <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
                     {!projectId && (
                         <div ref={projectDropdownRef} className="relative min-w-[220px]">
+                            <Tooltip content="Filter tasks by project" className="w-full inline-flex">
                             <button
                                 type="button"
                                 onClick={() => setProjectDropdownOpen(open => !open)}
@@ -169,6 +171,7 @@ const TaskFilters: React.FC<TaskFiltersProps> = ({
                                     <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.24 4.5a.75.75 0 01-1.08 0l-4.24-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
                                 </svg>
                             </button>
+                            </Tooltip>
                             {projectDropdownOpen && (
                                 <div className="absolute z-20 mt-1 w-full max-h-64 overflow-auto rounded-md border border-gray-300 bg-white shadow-lg dark:border-gray-600 dark:bg-gray-700">
                                     <button

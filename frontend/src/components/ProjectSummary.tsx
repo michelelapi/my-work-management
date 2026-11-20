@@ -1,6 +1,7 @@
 import React from 'react';
 import { Task } from '../types/task';
 import { useSearchParams } from 'react-router-dom';
+import Tooltip from './Tooltip';
 
 // Helper function to format numbers with thousands separators
 const formatNumber = (value: number, decimals: number = 2): string => {
@@ -91,9 +92,11 @@ const ProjectSummary: React.FC<ProjectSummaryProps> = ({
                         key={`${summary.projectId}-${summary.projectName}`}
                         className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-700/50"
                     >
-                        <h3 className="font-medium text-gray-900 dark:text-white mb-2 truncate" title={summary.projectName}>
-                            {summary.projectName}
-                        </h3>
+                        <Tooltip content={summary.projectName} className="w-full min-w-0 block mb-2" multiline>
+                            <h3 className="font-medium text-gray-900 dark:text-white truncate">
+                                {summary.projectName}
+                            </h3>
+                        </Tooltip>
                         <div className="space-y-1 text-sm">
                             <div className="flex justify-between">
                                 <span className="text-gray-600 dark:text-gray-400">Tasks:</span>

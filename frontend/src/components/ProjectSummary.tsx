@@ -343,6 +343,12 @@ const ProjectSummary: React.FC<ProjectSummaryProps> = ({
                                             <span className="font-medium text-gray-900 dark:text-white">{summary.taskCount}</span>
                                         </div>
                                         <div className="flex justify-between">
+                                            <span className="text-gray-600 dark:text-gray-400">Total Hours:</span>
+                                            <span className="font-medium text-gray-900 dark:text-white">
+                                                {formatNumber(summary.totalHours)}h
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between">
                                             <span className="text-gray-600 dark:text-gray-400">Latest bill date:</span>
                                             <span className="font-medium text-gray-900 dark:text-white">{formatDate(summary.latestBillingDate)}</span>
                                         </div>
@@ -351,21 +357,15 @@ const ProjectSummary: React.FC<ProjectSummaryProps> = ({
                                             <span className="font-medium text-gray-900 dark:text-white">{formatDate(summary.latestPaymentDate)}</span>
                                         </div>
                                         <div className="flex justify-between">
-                                            <span className="text-yellow-600 dark:text-yellow-300">To be billed:</span>
-                                            <span className="font-medium text-yellow-600 dark:text-yellow-300">
+                                            <span className="text-gray-600 dark:text-gray-400">To be billed:</span>
+                                            <span className="font-medium text-gray-900 dark:text-white">
                                                 ({formatNumber(summary.toBeBilledHours)}h) {formatCurrencyAmount(summary.toBeBilledAmount, summary.currency)}
                                             </span>
                                         </div>
                                         <div className="flex justify-between">
-                                            <span className="text-yellow-600 dark:text-yellow-300">To be paid:</span>
-                                            <span className="font-medium text-yellow-600 dark:text-yellow-300">
-                                                ({formatNumber(summary.toBePaidHours)}h) {formatCurrencyAmount(summary.toBePaidAmount, summary.currency)}
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-gray-600 dark:text-gray-400">Total Hours:</span>
+                                            <span className="text-gray-600 dark:text-gray-400">To be paid:</span>
                                             <span className="font-medium text-gray-900 dark:text-white">
-                                                {formatNumber(summary.totalHours)}h
+                                                ({formatNumber(summary.toBePaidHours)}h) {formatCurrencyAmount(summary.toBePaidAmount, summary.currency)}
                                             </span>
                                         </div>
                                         <div className="flex justify-between border-t border-gray-200 dark:border-gray-600 pt-1 mt-1">
@@ -379,14 +379,14 @@ const ProjectSummary: React.FC<ProjectSummaryProps> = ({
                                     <>
                                         <ContractAmountBlock availability={contractAvailabilityByProject[summary.projectId]} />
                                         <div className="flex justify-between">
-                                            <span className="text-yellow-600 dark:text-yellow-300">To be billed:</span>
-                                            <span className="font-medium text-yellow-600 dark:text-yellow-300">
+                                            <span className="text-gray-600 dark:text-gray-400">To be billed:</span>
+                                            <span className="font-medium text-gray-900 dark:text-white">
                                                 ({formatNumber(summary.toBeBilledHours)}h) {formatCurrencyAmount(summary.toBeBilledAmount, summary.currency)}
                                             </span>
                                         </div>
                                         <div className="flex justify-between">
-                                            <span className="text-yellow-600 dark:text-yellow-300">To be paid:</span>
-                                            <span className="font-medium text-yellow-600 dark:text-yellow-300">
+                                            <span className="text-gray-600 dark:text-gray-400">To be paid:</span>
+                                            <span className="font-medium text-gray-900 dark:text-white">
                                                 ({formatNumber(summary.toBePaidHours)}h) {formatCurrencyAmount(summary.toBePaidAmount, summary.currency)}
                                             </span>
                                         </div>

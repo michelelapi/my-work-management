@@ -1618,11 +1618,11 @@ const TaskListPage: React.FC = () => {
                     No tasks found.
                 </div>
             ) : (
-                <div className="overflow-x-auto bg-white dark:bg-gray-800 shadow-md rounded-lg mb-4">
-                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 table-fixed">
+                <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg mb-4">
+                    <table className="w-full table-fixed divide-y divide-gray-200 dark:divide-gray-700">
                         <thead className="bg-gray-50 dark:bg-gray-700">
                             <tr>
-                                <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/12">
+                                <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[4%]">
                                     <input
                                         type="checkbox"
                                         aria-label="Select all tasks"
@@ -1631,28 +1631,28 @@ const TaskListPage: React.FC = () => {
                                         className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                     />
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/12 cursor-pointer" onClick={() => handleSort('ticketId')}>
+                                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[10%] cursor-pointer" onClick={() => handleSort('ticketId')}>
                                     Task ID {sortField === 'ticketId' && (sortDirection === 'asc' ? '▲' : '▼')}
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-3/12 cursor-pointer" onClick={() => handleSort('title')}>
+                                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[22%] cursor-pointer" onClick={() => handleSort('title')}>
                                     Title {sortField === 'title' && (sortDirection === 'asc' ? '▲' : '▼')}
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-2/12">
+                                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[12%]">
                                     Project
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/12 cursor-pointer" onClick={() => handleSort('startDate')}>
+                                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[10%] cursor-pointer" onClick={() => handleSort('startDate')}>
                                     Start Date {sortField === 'startDate' && (sortDirection === 'asc' ? '▲' : '▼')}
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/12 cursor-pointer" onClick={() => handleSort('hoursWorked')}>
+                                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[7%] cursor-pointer" onClick={() => handleSort('hoursWorked')}>
                                     Hours {sortField === 'hoursWorked' && (sortDirection === 'asc' ? '▲' : '▼')}
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/12 cursor-pointer" onClick={() => handleSort('type')}>
+                                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[10%] cursor-pointer" onClick={() => handleSort('type')}>
                                     Type {sortField === 'type' && (sortDirection === 'asc' ? '▲' : '▼')}
                                 </th>
-                                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-2/12 cursor-pointer" onClick={() => handleSort('isBilled')}>
+                                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[15%] cursor-pointer" onClick={() => handleSort('isBilled')}>
                                     Status {sortField === 'isBilled' && (sortDirection === 'asc' ? '▲' : '▼')}
                                 </th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/12">
+                                <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[10%]">
                                     Actions
                                 </th>
                             </tr>
@@ -1660,7 +1660,7 @@ const TaskListPage: React.FC = () => {
                         <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                             {sortedTasks.map((task) => (
                                 <tr key={task.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                                    <td className="px-3 py-4 text-center w-1/12">
+                                    <td className="px-2 py-4 text-center">
                                         <input
                                             type="checkbox"
                                             aria-label={`Select task ${task.ticketId || task.id}`}
@@ -1673,36 +1673,36 @@ const TaskListPage: React.FC = () => {
                                             className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                         />
                                     </td>
-                                    <td className="px-6 py-4 break-words w-1/12">
-                                        <div className="text-sm font-medium text-gray-900 dark:text-white">{task.ticketId}</div>
+                                    <td className="px-3 py-4">
+                                        <div className="text-sm font-medium text-gray-900 dark:text-white truncate">{task.ticketId}</div>
                                     </td>
-                                    <td className="px-6 py-4 w-3/12 max-w-0">
+                                    <td className="px-3 py-4 max-w-0">
                                         <Tooltip content={task.title || ''} className="w-full min-w-0 block" multiline>
                                             <div className="text-sm text-gray-900 dark:text-white truncate w-full">
                                                 {task.title}
                                             </div>
                                         </Tooltip>
                                     </td>
-                                    <td className="px-6 py-4 break-words w-2/12">
-                                        <div className="text-sm text-gray-900 dark:text-white">{task.projectName}</div>
+                                    <td className="px-3 py-4">
+                                        <div className="text-sm text-gray-900 dark:text-white truncate">{task.projectName}</div>
                                     </td>
-                                    <td className="px-6 py-4 break-words w-1/12">
-                                        <div className="text-sm text-gray-500 dark:text-gray-300">
+                                    <td className="px-3 py-4">
+                                        <div className="text-sm text-gray-500 dark:text-gray-300 truncate">
                                             {new Date(task.startDate).toLocaleDateString()}
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 break-words w-1/12">
-                                        <div className="text-sm text-gray-500 dark:text-gray-300">
+                                    <td className="px-3 py-4">
+                                        <div className="text-sm text-gray-500 dark:text-gray-300 truncate">
                                             {task.hoursWorked} h
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 break-words w-1/12">
-                                        <div className="text-sm text-gray-500 dark:text-gray-300">
+                                    <td className="px-3 py-4">
+                                        <div className="text-sm text-gray-500 dark:text-gray-300 truncate">
                                             {task.type || '-'}
                                         </div>
                                     </td>
-                                    <td className="px-3 py-4 break-words w-2/12">
-                                        <div className="flex flex-col gap-1.5 min-w-[7.5rem]">
+                                    <td className="px-3 py-4">
+                                        <div className="flex flex-col gap-1.5 min-w-0">
                                             <div className="grid grid-cols-2 gap-1 items-start">
                                                 <Tooltip
                                                     content={
@@ -1829,7 +1829,7 @@ const TaskListPage: React.FC = () => {
                                             )}
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 text-right text-sm font-medium break-words w-1/12">
+                                    <td className="px-3 py-4 text-right text-sm font-medium whitespace-nowrap">
                                         <Tooltip content="Edit task" position="bottom">
                                             <button
                                                 onClick={() => {
@@ -1837,7 +1837,7 @@ const TaskListPage: React.FC = () => {
                                                         navigate(`/companies/${task.projectId}/projects/${task.projectId}/tasks/${task.id}/edit`);
                                                     }
                                                 }}
-                                                className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-4"
+                                                className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-3"
                                             >
                                                 <FaPen size={16} className="inline-block" />
                                             </button>

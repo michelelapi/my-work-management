@@ -1,3 +1,66 @@
 @tailwind base;
 @tailwind components;
-@tailwind utilities; 
+@tailwind utilities;
+
+/* Main window: vertical scrollbar only, styled */
+html {
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: #9ca3af transparent; /* thumb | track (light) */
+}
+
+html.dark {
+  scrollbar-color: #6b7280 transparent; /* thumb | track (dark) */
+}
+
+html::-webkit-scrollbar {
+  width: 10px;
+  height: 0; /* no horizontal scrollbar */
+}
+
+html::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+html::-webkit-scrollbar-thumb {
+  background-color: #9ca3af;
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+html.dark::-webkit-scrollbar-thumb {
+  background-color: #6b7280;
+}
+
+html::-webkit-scrollbar-thumb:hover {
+  background-color: #6b7280;
+}
+
+html.dark::-webkit-scrollbar-thumb:hover {
+  background-color: #9ca3af;
+}
+
+html::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Nested scroll areas (tables, panels): no visible scrollbars */
+body,
+#root,
+.overflow-x-auto,
+.overflow-y-auto,
+.overflow-auto {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+body::-webkit-scrollbar,
+#root::-webkit-scrollbar,
+.overflow-x-auto::-webkit-scrollbar,
+.overflow-y-auto::-webkit-scrollbar,
+.overflow-auto::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}

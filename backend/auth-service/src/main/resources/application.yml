@@ -37,3 +37,10 @@ db-backup:
   directory: db-backup
   use-docker: true
   docker-container: auth-service-db
+
+google:
+  drive:
+    backup-folder-id: 1YCWnSmeJItnrq7M-QWJ0OQRTpfOW5rfo
+    # Reuses company-service OAuth client + stored user token
+    oauth-client-path: ../company-service/src/main/resources/google-drive-oauth-client.json
+    token-directory: ../company-service/src/main/resources/google-drive-tokens

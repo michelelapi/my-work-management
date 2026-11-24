@@ -1,5 +1,6 @@
 package com.myworkmanagement.authservice.controller;
 
+import com.myworkmanagement.authservice.dto.BackupType;
 import com.myworkmanagement.authservice.dto.DbBackupDTO;
 import com.myworkmanagement.authservice.service.DbBackupService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -10,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -23,9 +25,14 @@ public class DbBackupController {
     private final DbBackupService dbBackupService;
 
     @PostMapping
-    @Operation(summary = "Create database backup", description = "Creates a SQL dump of the authentication database")
-    public ResponseEntity<DbBackupDTO> createBackup() {
-        return ResponseEntity.status(HttpStatus.CREATED).body(dbBackupService.createBackup());
+    @Operation(
+            summary = "Create database backup",
+            description = "Creates a FULL (entire DB) or INCREMENTAL (changed tables only) SQL dump"
+    )
+    public ResponseEntity<DbBackupDTO> createBackup(
+            @RequestParam(defaultValue = "INCREMENTAL") BackupType type
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(dbBackupService.createBackup(type));
     }
 
     @GetMapping

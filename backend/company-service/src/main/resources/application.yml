@@ -55,3 +55,12 @@ db-backup:
   directory: db-backup
   use-docker: true
   docker-container: company-service-db
+
+google:
+  credentials-path: src/main/resources/google-sheets-credentials.json
+  drive:
+    # Personal Drive folder owned by your Google user (service accounts cannot upload to personal Drive).
+    backup-folder-id: 1YCWnSmeJItnrq7M-QWJ0OQRTpfOW5rfo
+    # Desktop OAuth client JSON from Google Cloud Console (one-time setup via GoogleDriveAuthSetup).
+    oauth-client-path: src/main/resources/google-drive-oauth-client.json
+    token-directory: src/main/resources/google-drive-tokens

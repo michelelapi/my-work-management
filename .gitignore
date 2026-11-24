@@ -108,9 +108,15 @@ build/
 .env.test.local
 .env.production.local 
 google-sheets-credentials.json
+google-drive-oauth-client.json
+google-drive-tokens/
 
 .cursor
 
 # Database backups (keep folder, ignore dump files)
 backend/auth-service/db-backup/*.sql
+backend/auth-service/db-backup/.table-stats.json
+backend/auth-service/db-backup/.drive-meta.json
 backend/company-service/db-backup/*.sql
+backend/company-service/db-backup/.table-stats.json
+backend/company-service/db-backup/.drive-meta.json

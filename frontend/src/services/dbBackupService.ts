@@ -1,6 +1,6 @@
 import axios from 'axios';
 import config from '../config';
-import { DbBackup } from '../types/dbBackup';
+import { BackupType, DbBackup } from '../types/dbBackup';
 
 const getAuthHeaders = () => {
   const token = localStorage.getItem('token');
@@ -26,12 +26,12 @@ const dbBackupService = {
     return response.data;
   },
 
-  async createCompanyBackup(): Promise<DbBackup> {
+  async createCompanyBackup(type: BackupType): Promise<DbBackup> {
     try {
       const response = await axios.post<DbBackup>(
         `${config.api.companyServiceUrl}/api/db-backups`,
         {},
-        { headers: getAuthHeaders() }
+        { headers: getAuthHeaders(), params: { type } }
       );
       return response.data;
     } catch (error) {
@@ -47,12 +47,12 @@ const dbBackupService = {
     return response.data;
   },
 
-  async createAuthBackup(): Promise<DbBackup> {
+  async createAuthBackup(type: BackupType): Promise<DbBackup> {
     try {
       const response = await axios.post<DbBackup>(
         `${config.api.baseUrl}/api/db-backups`,
         {},
-        { headers: getAuthHeaders() }
+        { headers: getAuthHeaders(), params: { type } }
       );
       return response.data;
     } catch (error) {

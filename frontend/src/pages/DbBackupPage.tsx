@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import dbBackupService from '../services/dbBackupService';
-import { DbBackup } from '../types/dbBackup';
+import { BackupType, DbBackup } from '../types/dbBackup';
 
 const formatFileSize = (bytes: number): string => {
   if (bytes < 1024) {
@@ -12,20 +12,32 @@ const formatFileSize = (bytes: number): string => {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 };
 
+const formatBackupType = (type?: BackupType): string => {
+  if (type === 'INCREMENTAL') {
+    return 'Incremental';
+  }
+  if (type === 'FULL') {
+    return 'Full';
+  }
+  return '—';
+};
+
 type BackupSectionProps = {
   title: string;
   description: string;
   backups: DbBackup[];
-  creating: boolean;
-  onCreateBackup: () => void;
+  creatingIncremental: boolean;
+  disabled: boolean;
+  onCreateIncrementalBackup: () => void;
 };
 
 const BackupSection: React.FC<BackupSectionProps> = ({
   title,
   description,
   backups,
-  creating,
-  onCreateBackup,
+  creatingIncremental,
+  disabled,
+  onCreateIncrementalBackup,
 }) => (
   <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 mb-6">
     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
@@ -34,11 +46,11 @@ const BackupSection: React.FC<BackupSectionProps> = ({
         <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{description}</p>
       </div>
       <button
-        onClick={onCreateBackup}
-        disabled={creating}
+        onClick={onCreateIncrementalBackup}
+        disabled={disabled}
         className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white px-4 py-2 rounded-md transition-colors whitespace-nowrap"
       >
-        {creating ? 'Creating backup...' : 'Create Backup'}
+        {creatingIncremental ? 'Creating incremental backup...' : 'Create Incremental Backup'}
       </button>
     </div>
 
@@ -55,6 +67,9 @@ const BackupSection: React.FC<BackupSectionProps> = ({
                 File Name
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                Type
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                 Database
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -63,15 +78,47 @@ const BackupSection: React.FC<BackupSectionProps> = ({
               <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                 Size
               </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                Google Drive
+              </th>
             </tr>
           </thead>
           <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
             {backups.map((backup) => (
               <tr key={backup.fileName} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                <td className="px-4 py-3 text-sm font-mono">{backup.fileName}</td>
+                <td className="px-4 py-3 text-sm font-mono">
+                  <span className="mr-2">{backup.fileName}</span>
+                  {backup.googleDriveWebViewLink && (
+                    <a
+                      href={backup.googleDriveWebViewLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-sans text-blue-600 hover:underline dark:text-blue-400"
+                    >
+                      Open
+                    </a>
+                  )}
+                </td>
+                <td className="px-4 py-3 text-sm">{formatBackupType(backup.backupType)}</td>
                 <td className="px-4 py-3 text-sm">{backup.databaseName}</td>
                 <td className="px-4 py-3 text-sm">{new Date(backup.createdAt).toLocaleString()}</td>
                 <td className="px-4 py-3 text-sm text-right">{formatFileSize(backup.sizeBytes)}</td>
+                <td className="px-4 py-3 text-sm">
+                  {backup.uploadedToGoogleDrive && backup.googleDriveWebViewLink ? (
+                    <a
+                      href={backup.googleDriveWebViewLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline dark:text-blue-400"
+                    >
+                      Open
+                    </a>
+                  ) : backup.uploadedToGoogleDrive ? (
+                    'Uploaded'
+                  ) : (
+                    '—'
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -85,8 +132,10 @@ const DbBackupPage: React.FC = () => {
   const [companyBackups, setCompanyBackups] = useState<DbBackup[]>([]);
   const [authBackups, setAuthBackups] = useState<DbBackup[]>([]);
   const [loading, setLoading] = useState(true);
-  const [creatingCompany, setCreatingCompany] = useState(false);
-  const [creatingAuth, setCreatingAuth] = useState(false);
+  const [creatingCompanyFull, setCreatingCompanyFull] = useState(false);
+  const [creatingAuthFull, setCreatingAuthFull] = useState(false);
+  const [creatingCompanyIncremental, setCreatingCompanyIncremental] = useState(false);
+  const [creatingAuthIncremental, setCreatingAuthIncremental] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -112,35 +161,45 @@ const DbBackupPage: React.FC = () => {
     loadBackups();
   }, [loadBackups]);
 
-  const handleCreateCompanyBackup = async () => {
+  const buildSuccessMessage = (label: string, created: DbBackup): string => {
+    const typeLabel = created.backupType === 'FULL' ? 'full' : 'incremental';
+    if (created.uploadedToGoogleDrive) {
+      return `${label} ${typeLabel} backup created and copied to Google Drive: ${created.fileName}`;
+    }
+    return `${label} ${typeLabel} backup created locally: ${created.fileName} (Google Drive upload was skipped or failed — check server logs)`;
+  };
+
+  const handleCreateCompanyBackup = async (type: BackupType) => {
+    const setCreating = type === 'FULL' ? setCreatingCompanyFull : setCreatingCompanyIncremental;
     try {
-      setCreatingCompany(true);
+      setCreating(true);
       setError(null);
       setSuccess(null);
-      const created = await dbBackupService.createCompanyBackup();
+      const created = await dbBackupService.createCompanyBackup(type);
       setCompanyBackups((prev) => [created, ...prev]);
-      setSuccess(`Company database backup created: ${created.fileName}`);
+      setSuccess(buildSuccessMessage('Company', created));
     } catch (err) {
       console.error('Error creating company backup:', err);
       setError(err instanceof Error ? err.message : 'Failed to create company database backup.');
     } finally {
-      setCreatingCompany(false);
+      setCreating(false);
     }
   };
 
-  const handleCreateAuthBackup = async () => {
+  const handleCreateAuthBackup = async (type: BackupType) => {
+    const setCreating = type === 'FULL' ? setCreatingAuthFull : setCreatingAuthIncremental;
     try {
-      setCreatingAuth(true);
+      setCreating(true);
       setError(null);
       setSuccess(null);
-      const created = await dbBackupService.createAuthBackup();
+      const created = await dbBackupService.createAuthBackup(type);
       setAuthBackups((prev) => [created, ...prev]);
-      setSuccess(`Authentication database backup created: ${created.fileName}`);
+      setSuccess(buildSuccessMessage('Authentication', created));
     } catch (err) {
       console.error('Error creating auth backup:', err);
       setError(err instanceof Error ? err.message : 'Failed to create authentication database backup.');
     } finally {
-      setCreatingAuth(false);
+      setCreating(false);
     }
   };
 
@@ -148,13 +207,36 @@ const DbBackupPage: React.FC = () => {
     return <div className="flex justify-center items-center min-h-screen">Loading database backups...</div>;
   }
 
+  const anyCreating =
+    creatingCompanyFull || creatingAuthFull || creatingCompanyIncremental || creatingAuthIncremental;
+
   return (
     <div className="container mx-auto p-4">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold">Database Backups</h1>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-          Create and review SQL dumps stored in each service&apos;s <code className="font-mono">db-backup</code> folder.
-        </p>
+      <div className="mb-6 flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold">Database Backups</h1>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            Use <strong>entire</strong> backups for a full DB snapshot, and <strong>incremental</strong> backups for
+            tables changed since the last backup. Files are stored in each service&apos;s{' '}
+            <code className="font-mono">db-backup</code> folder and copied to Google Drive.
+          </p>
+        </div>
+        <div className="flex flex-col sm:flex-row gap-3 shrink-0">
+          <button
+            onClick={() => handleCreateCompanyBackup('FULL')}
+            disabled={anyCreating}
+            className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-md transition-colors whitespace-nowrap"
+          >
+            {creatingCompanyFull ? 'Backing up Company DB...' : 'Backup Entire Company DB'}
+          </button>
+          <button
+            onClick={() => handleCreateAuthBackup('FULL')}
+            disabled={anyCreating}
+            className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-md transition-colors whitespace-nowrap"
+          >
+            {creatingAuthFull ? 'Backing up Auth DB...' : 'Backup Entire Auth DB'}
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -171,18 +253,20 @@ const DbBackupPage: React.FC = () => {
 
       <BackupSection
         title="Company Database"
-        description="Backups for company_service_db (company-service)."
+        description="Incremental backups dump only tables changed since the last backup baseline."
         backups={companyBackups}
-        creating={creatingCompany}
-        onCreateBackup={handleCreateCompanyBackup}
+        creatingIncremental={creatingCompanyIncremental}
+        disabled={anyCreating}
+        onCreateIncrementalBackup={() => handleCreateCompanyBackup('INCREMENTAL')}
       />
 
       <BackupSection
         title="Authentication Database"
-        description="Backups for auth_service_db (auth-service)."
+        description="Incremental backups dump only tables changed since the last backup baseline."
         backups={authBackups}
-        creating={creatingAuth}
-        onCreateBackup={handleCreateAuthBackup}
+        creatingIncremental={creatingAuthIncremental}
+        disabled={anyCreating}
+        onCreateIncrementalBackup={() => handleCreateAuthBackup('INCREMENTAL')}
       />
     </div>
   );

@@ -14,4 +14,8 @@ public class DbBackupDTO {
     private String databaseName;
     private long sizeBytes;
     private String createdAt;
+    private BackupType backupType;
+    private boolean uploadedToGoogleDrive;
+    private String googleDriveFileId;
+    private String googleDriveWebViewLink;
 }

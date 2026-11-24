@@ -114,6 +114,13 @@
     <version>v4-rev20220927-2.0.0</version>
 </dependency>
 
+<!-- Google Drive API -->
+<dependency>
+    <groupId>com.google.apis</groupId>
+    <artifactId>google-api-services-drive</artifactId>
+    <version>v3-rev20240509-2.0.0</version>
+</dependency>
+
 <!-- Add Google Auth Library -->
 <dependency>
     <groupId>com.google.auth</groupId>
@@ -141,6 +148,14 @@
                             <artifactId>lombok</artifactId>
                         </exclude>
                     </excludes>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.5.0</version>
+                <configuration>
+                    <mainClass>com.myworkmanagement.company.service.GoogleDriveAuthSetup</mainClass>
                 </configuration>
             </plugin>
             <plugin>

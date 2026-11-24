@@ -1,8 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Task } from '../types/task';
 import { useSearchParams } from 'react-router-dom';
-import { FaChevronDown } from '@react-icons/all-files/fa/FaChevronDown';
-import { FaChevronUp } from '@react-icons/all-files/fa/FaChevronUp';
 import contractService from '../services/contractService';
 import Tooltip from './Tooltip';
 
@@ -324,15 +322,12 @@ const ProjectSummary: React.FC<ProjectSummaryProps> = ({
                             }}
                             className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-700/50 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                         >
-                            <div className="flex items-start justify-between gap-2 mb-2">
-                                <Tooltip content={summary.projectName} className="min-w-0 flex-1 block" multiline>
+                            <div className="mb-2">
+                                <Tooltip content={summary.projectName} className="min-w-0 block" multiline>
                                     <h3 className="font-medium text-gray-900 dark:text-white truncate">
                                         {summary.projectName}
                                     </h3>
                                 </Tooltip>
-                                <span className="text-gray-400 dark:text-gray-500 shrink-0 mt-0.5">
-                                    {isExpanded ? <FaChevronUp size={12} /> : <FaChevronDown size={12} />}
-                                </span>
                             </div>
                             <div className="space-y-1 text-sm">
                                 {isExpanded ? (
